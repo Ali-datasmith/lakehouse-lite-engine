@@ -1,0 +1,446 @@
+{
+  "header": {
+    "seed": 20260930,
+    "python_version": "3.13.12 (main, Mar  3 2026, 15:01:51) [Clang 21.1.4 ]",
+    "pyarrow_version": "25.0.1",
+    "polars_version": "1.44.2",
+    "duckdb_version": "1.5.6",
+    "pyiceberg_version": "0.12.0",
+    "cpu_count": 4,
+    "os_name": "linux"
+  },
+  "results": [
+    {
+      "layout": "csv",
+      "engine": "duckdb",
+      "query": "Q1_point",
+      "timing": {
+        "p50_ms": 1.104056,
+        "p95_ms": 1.104056,
+        "min_ms": 1.096724,
+        "max_ms": 1.104056
+      },
+      "memory": {
+        "peak_rss_bytes": 157548544,
+        "peak_arrow_bytes": 0,
+        "peak_python_heap_bytes": 0,
+        "ru_maxrss_bytes": 159752192
+      },
+      "s3_requests": {
+        "GET": 0,
+        "PUT": 0,
+        "HEAD": 0,
+        "LIST": 0
+      },
+      "est_usd_per_1k": 0.0
+    },
+    {
+      "layout": "csv",
+      "engine": "duckdb",
+      "query": "Q2_range_agg",
+      "timing": {
+        "p50_ms": 1.141478,
+        "p95_ms": 1.141478,
+        "min_ms": 1.103536,
+        "max_ms": 1.141478
+      },
+      "memory": {
+        "peak_rss_bytes": 157421568,
+        "peak_arrow_bytes": 0,
+        "peak_python_heap_bytes": 0,
+        "ru_maxrss_bytes": 159752192
+      },
+      "s3_requests": {
+        "GET": 0,
+        "PUT": 0,
+        "HEAD": 0,
+        "LIST": 0
+      },
+      "est_usd_per_1k": 0.0
+    },
+    {
+      "layout": "csv",
+      "engine": "duckdb",
+      "query": "Q3_topn",
+      "timing": {
+        "p50_ms": 1.132159,
+        "p95_ms": 1.132159,
+        "min_ms": 1.105118,
+        "max_ms": 1.132159
+      },
+      "memory": {
+        "peak_rss_bytes": 157286400,
+        "peak_arrow_bytes": 0,
+        "peak_python_heap_bytes": 0,
+        "ru_maxrss_bytes": 159752192
+      },
+      "s3_requests": {
+        "GET": 0,
+        "PUT": 0,
+        "HEAD": 0,
+        "LIST": 0
+      },
+      "est_usd_per_1k": 0.0
+    },
+    {
+      "layout": "csv",
+      "engine": "polars",
+      "query": "Q1_point",
+      "timing": {
+        "p50_ms": 1.126615,
+        "p95_ms": 1.126615,
+        "min_ms": 1.118278,
+        "max_ms": 1.126615
+      },
+      "memory": {
+        "peak_rss_bytes": 157937664,
+        "peak_arrow_bytes": 0,
+        "peak_python_heap_bytes": 0,
+        "ru_maxrss_bytes": 159752192
+      },
+      "s3_requests": {
+        "GET": 0,
+        "PUT": 0,
+        "HEAD": 0,
+        "LIST": 0
+      },
+      "est_usd_per_1k": 0.0
+    },
+    {
+      "layout": "csv",
+      "engine": "polars",
+      "query": "Q2_range_agg",
+      "timing": {
+        "p50_ms": 1.11015,
+        "p95_ms": 1.11015,
+        "min_ms": 1.101932,
+        "max_ms": 1.11015
+      },
+      "memory": {
+        "peak_rss_bytes": 157011968,
+        "peak_arrow_bytes": 0,
+        "peak_python_heap_bytes": 0,
+        "ru_maxrss_bytes": 159752192
+      },
+      "s3_requests": {
+        "GET": 0,
+        "PUT": 0,
+        "HEAD": 0,
+        "LIST": 0
+      },
+      "est_usd_per_1k": 0.0
+    },
+    {
+      "layout": "csv",
+      "engine": "polars",
+      "query": "Q3_topn",
+      "timing": {
+        "p50_ms": 1.166345,
+        "p95_ms": 1.166345,
+        "min_ms": 1.132536,
+        "max_ms": 1.166345
+      },
+      "memory": {
+        "peak_rss_bytes": 157675520,
+        "peak_arrow_bytes": 0,
+        "peak_python_heap_bytes": 0,
+        "ru_maxrss_bytes": 159752192
+      },
+      "s3_requests": {
+        "GET": 0,
+        "PUT": 0,
+        "HEAD": 0,
+        "LIST": 0
+      },
+      "est_usd_per_1k": 0.0
+    },
+    {
+      "layout": "raw_parquet",
+      "engine": "duckdb",
+      "query": "Q1_point",
+      "timing": {
+        "p50_ms": 1.18443,
+        "p95_ms": 1.18443,
+        "min_ms": 1.110534,
+        "max_ms": 1.18443
+      },
+      "memory": {
+        "peak_rss_bytes": 157540352,
+        "peak_arrow_bytes": 0,
+        "peak_python_heap_bytes": 0,
+        "ru_maxrss_bytes": 159752192
+      },
+      "s3_requests": {
+        "GET": 0,
+        "PUT": 0,
+        "HEAD": 0,
+        "LIST": 0
+      },
+      "est_usd_per_1k": 0.0
+    },
+    {
+      "layout": "raw_parquet",
+      "engine": "duckdb",
+      "query": "Q2_range_agg",
+      "timing": {
+        "p50_ms": 1.166653,
+        "p95_ms": 1.166653,
+        "min_ms": 1.107713,
+        "max_ms": 1.166653
+      },
+      "memory": {
+        "peak_rss_bytes": 157159424,
+        "peak_arrow_bytes": 0,
+        "peak_python_heap_bytes": 0,
+        "ru_maxrss_bytes": 159752192
+      },
+      "s3_requests": {
+        "GET": 0,
+        "PUT": 0,
+        "HEAD": 0,
+        "LIST": 0
+      },
+      "est_usd_per_1k": 0.0
+    },
+    {
+      "layout": "raw_parquet",
+      "engine": "duckdb",
+      "query": "Q3_topn",
+      "timing": {
+        "p50_ms": 1.149119,
+        "p95_ms": 1.149119,
+        "min_ms": 1.11418,
+        "max_ms": 1.149119
+      },
+      "memory": {
+        "peak_rss_bytes": 157798400,
+        "peak_arrow_bytes": 0,
+        "peak_python_heap_bytes": 0,
+        "ru_maxrss_bytes": 159752192
+      },
+      "s3_requests": {
+        "GET": 0,
+        "PUT": 0,
+        "HEAD": 0,
+        "LIST": 0
+      },
+      "est_usd_per_1k": 0.0
+    },
+    {
+      "layout": "raw_parquet",
+      "engine": "polars",
+      "query": "Q1_point",
+      "timing": {
+        "p50_ms": 1.130903,
+        "p95_ms": 1.130903,
+        "min_ms": 1.104193,
+        "max_ms": 1.130903
+      },
+      "memory": {
+        "peak_rss_bytes": 157548544,
+        "peak_arrow_bytes": 0,
+        "peak_python_heap_bytes": 0,
+        "ru_maxrss_bytes": 159752192
+      },
+      "s3_requests": {
+        "GET": 0,
+        "PUT": 0,
+        "HEAD": 0,
+        "LIST": 0
+      },
+      "est_usd_per_1k": 0.0
+    },
+    {
+      "layout": "raw_parquet",
+      "engine": "polars",
+      "query": "Q2_range_agg",
+      "timing": {
+        "p50_ms": 1.096926,
+        "p95_ms": 1.096926,
+        "min_ms": 1.093461,
+        "max_ms": 1.096926
+      },
+      "memory": {
+        "peak_rss_bytes": 157024256,
+        "peak_arrow_bytes": 0,
+        "peak_python_heap_bytes": 0,
+        "ru_maxrss_bytes": 159752192
+      },
+      "s3_requests": {
+        "GET": 0,
+        "PUT": 0,
+        "HEAD": 0,
+        "LIST": 0
+      },
+      "est_usd_per_1k": 0.0
+    },
+    {
+      "layout": "raw_parquet",
+      "engine": "polars",
+      "query": "Q3_topn",
+      "timing": {
+        "p50_ms": 1.182524,
+        "p95_ms": 1.182524,
+        "min_ms": 1.110761,
+        "max_ms": 1.182524
+      },
+      "memory": {
+        "peak_rss_bytes": 157683712,
+        "peak_arrow_bytes": 0,
+        "peak_python_heap_bytes": 0,
+        "ru_maxrss_bytes": 159752192
+      },
+      "s3_requests": {
+        "GET": 0,
+        "PUT": 0,
+        "HEAD": 0,
+        "LIST": 0
+      },
+      "est_usd_per_1k": 0.0
+    },
+    {
+      "layout": "iceberg_compacted",
+      "engine": "duckdb",
+      "query": "Q1_point",
+      "timing": {
+        "p50_ms": 1.105755,
+        "p95_ms": 1.105755,
+        "min_ms": 1.094774,
+        "max_ms": 1.105755
+      },
+      "memory": {
+        "peak_rss_bytes": 157687808,
+        "peak_arrow_bytes": 0,
+        "peak_python_heap_bytes": 0,
+        "ru_maxrss_bytes": 159752192
+      },
+      "s3_requests": {
+        "GET": 0,
+        "PUT": 0,
+        "HEAD": 0,
+        "LIST": 0
+      },
+      "est_usd_per_1k": 0.0
+    },
+    {
+      "layout": "iceberg_compacted",
+      "engine": "duckdb",
+      "query": "Q2_range_agg",
+      "timing": {
+        "p50_ms": 1.124791,
+        "p95_ms": 1.124791,
+        "min_ms": 1.09703,
+        "max_ms": 1.124791
+      },
+      "memory": {
+        "peak_rss_bytes": 157151232,
+        "peak_arrow_bytes": 0,
+        "peak_python_heap_bytes": 0,
+        "ru_maxrss_bytes": 159752192
+      },
+      "s3_requests": {
+        "GET": 0,
+        "PUT": 0,
+        "HEAD": 0,
+        "LIST": 0
+      },
+      "est_usd_per_1k": 0.0
+    },
+    {
+      "layout": "iceberg_compacted",
+      "engine": "duckdb",
+      "query": "Q3_topn",
+      "timing": {
+        "p50_ms": 1.141728,
+        "p95_ms": 1.141728,
+        "min_ms": 1.122009,
+        "max_ms": 1.141728
+      },
+      "memory": {
+        "peak_rss_bytes": 157679616,
+        "peak_arrow_bytes": 0,
+        "peak_python_heap_bytes": 0,
+        "ru_maxrss_bytes": 159752192
+      },
+      "s3_requests": {
+        "GET": 0,
+        "PUT": 0,
+        "HEAD": 0,
+        "LIST": 0
+      },
+      "est_usd_per_1k": 0.0
+    },
+    {
+      "layout": "iceberg_compacted",
+      "engine": "polars",
+      "query": "Q1_point",
+      "timing": {
+        "p50_ms": 1.113385,
+        "p95_ms": 1.113385,
+        "min_ms": 1.101422,
+        "max_ms": 1.113385
+      },
+      "memory": {
+        "peak_rss_bytes": 157429760,
+        "peak_arrow_bytes": 0,
+        "peak_python_heap_bytes": 0,
+        "ru_maxrss_bytes": 159752192
+      },
+      "s3_requests": {
+        "GET": 0,
+        "PUT": 0,
+        "HEAD": 0,
+        "LIST": 0
+      },
+      "est_usd_per_1k": 0.0
+    },
+    {
+      "layout": "iceberg_compacted",
+      "engine": "polars",
+      "query": "Q2_range_agg",
+      "timing": {
+        "p50_ms": 1.106187,
+        "p95_ms": 1.106187,
+        "min_ms": 1.099057,
+        "max_ms": 1.106187
+      },
+      "memory": {
+        "peak_rss_bytes": 156377088,
+        "peak_arrow_bytes": 0,
+        "peak_python_heap_bytes": 0,
+        "ru_maxrss_bytes": 159752192
+      },
+      "s3_requests": {
+        "GET": 0,
+        "PUT": 0,
+        "HEAD": 0,
+        "LIST": 0
+      },
+      "est_usd_per_1k": 0.0
+    },
+    {
+      "layout": "iceberg_compacted",
+      "engine": "polars",
+      "query": "Q3_topn",
+      "timing": {
+        "p50_ms": 1.14673,
+        "p95_ms": 1.14673,
+        "min_ms": 1.109384,
+        "max_ms": 1.14673
+      },
+      "memory": {
+        "peak_rss_bytes": 157425664,
+        "peak_arrow_bytes": 0,
+        "peak_python_heap_bytes": 0,
+        "ru_maxrss_bytes": 159752192
+      },
+      "s3_requests": {
+        "GET": 0,
+        "PUT": 0,
+        "HEAD": 0,
+        "LIST": 0
+      },
+      "est_usd_per_1k": 0.0
+    }
+  ]
+}
