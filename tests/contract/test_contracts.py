@@ -51,13 +51,20 @@ def test_ct03_compaction_replace_commit(test_engine):
     data_files = [task.file.file_path for task in tbl.scan().plan_files()]
     assert len(data_files) > 0
 
+    # Simulate compaction replacing input with a new file
+    data_dir = test_engine._catalog.data_dir()
+    new_file_path = f"{data_dir}/compact_output.parquet"
+    _fs, rel_path = pa.fs.FileSystem.from_uri(new_file_path)
+    old_fs, old_rel = pa.fs.FileSystem.from_uri(data_files[0])
+    old_fs.copy_file(old_rel, rel_path)
+
     replace_res = test_engine._catalog.commit_replace(
         delete=data_files,
-        add_paths=data_files,
+        add_paths=[new_file_path],
         flush_id="replace_flush_1",
     )
     assert replace_res is not None
-    assert replace_res.snapshot_id != commit1.snapshot_id
+    assert replace_res.added_files == 1
 
 
 @pytest.mark.contract

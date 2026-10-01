@@ -26,7 +26,7 @@ jobs:
         run: uv sync
 
       - name: Run Ruff check & format check
-        run: uv run ruff check --extend-ignore PLR0913,PLR0915 src tests
+        run: uv run ruff check src tests
 
       - name: Run Mypy strict check
         run: uv run mypy src/lakehouse_engine

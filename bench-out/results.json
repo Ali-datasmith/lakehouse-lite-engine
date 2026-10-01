@@ -15,16 +15,16 @@
       "engine": "duckdb",
       "query": "Q1_point",
       "timing": {
-        "p50_ms": 1.104056,
-        "p95_ms": 1.104056,
-        "min_ms": 1.096724,
-        "max_ms": 1.104056
+        "p50_ms": 1407.51721,
+        "p95_ms": 1407.51721,
+        "min_ms": 1340.510879,
+        "max_ms": 1407.51721
       },
       "memory": {
-        "peak_rss_bytes": 157548544,
-        "peak_arrow_bytes": 0,
+        "peak_rss_bytes": 220975104,
+        "peak_arrow_bytes": 645440,
         "peak_python_heap_bytes": 0,
-        "ru_maxrss_bytes": 159752192
+        "ru_maxrss_bytes": 220975104
       },
       "s3_requests": {
         "GET": 0,
@@ -39,16 +39,16 @@
       "engine": "duckdb",
       "query": "Q2_range_agg",
       "timing": {
-        "p50_ms": 1.141478,
-        "p95_ms": 1.141478,
-        "min_ms": 1.103536,
-        "max_ms": 1.141478
+        "p50_ms": 1294.839179,
+        "p95_ms": 1294.839179,
+        "min_ms": 1279.86648,
+        "max_ms": 1294.839179
       },
       "memory": {
-        "peak_rss_bytes": 157421568,
-        "peak_arrow_bytes": 0,
+        "peak_rss_bytes": 221257728,
+        "peak_arrow_bytes": 645440,
         "peak_python_heap_bytes": 0,
-        "ru_maxrss_bytes": 159752192
+        "ru_maxrss_bytes": 221257728
       },
       "s3_requests": {
         "GET": 0,
@@ -63,16 +63,16 @@
       "engine": "duckdb",
       "query": "Q3_topn",
       "timing": {
-        "p50_ms": 1.132159,
-        "p95_ms": 1.132159,
-        "min_ms": 1.105118,
-        "max_ms": 1.132159
+        "p50_ms": 1303.684518,
+        "p95_ms": 1303.684518,
+        "min_ms": 1294.031147,
+        "max_ms": 1303.684518
       },
       "memory": {
-        "peak_rss_bytes": 157286400,
-        "peak_arrow_bytes": 0,
+        "peak_rss_bytes": 224833536,
+        "peak_arrow_bytes": 645440,
         "peak_python_heap_bytes": 0,
-        "ru_maxrss_bytes": 159752192
+        "ru_maxrss_bytes": 224833536
       },
       "s3_requests": {
         "GET": 0,
@@ -87,16 +87,16 @@
       "engine": "polars",
       "query": "Q1_point",
       "timing": {
-        "p50_ms": 1.126615,
-        "p95_ms": 1.126615,
-        "min_ms": 1.118278,
-        "max_ms": 1.126615
+        "p50_ms": 16.240892,
+        "p95_ms": 16.240892,
+        "min_ms": 14.676347,
+        "max_ms": 16.240892
       },
       "memory": {
-        "peak_rss_bytes": 157937664,
-        "peak_arrow_bytes": 0,
+        "peak_rss_bytes": 221007872,
+        "peak_arrow_bytes": 645440,
         "peak_python_heap_bytes": 0,
-        "ru_maxrss_bytes": 159752192
+        "ru_maxrss_bytes": 222646272
       },
       "s3_requests": {
         "GET": 0,
@@ -111,16 +111,16 @@
       "engine": "polars",
       "query": "Q2_range_agg",
       "timing": {
-        "p50_ms": 1.11015,
-        "p95_ms": 1.11015,
-        "min_ms": 1.101932,
-        "max_ms": 1.11015
+        "p50_ms": 13.890781,
+        "p95_ms": 13.890781,
+        "min_ms": 13.098463,
+        "max_ms": 13.890781
       },
       "memory": {
-        "peak_rss_bytes": 157011968,
-        "peak_arrow_bytes": 0,
+        "peak_rss_bytes": 213463040,
+        "peak_arrow_bytes": 645440,
         "peak_python_heap_bytes": 0,
-        "ru_maxrss_bytes": 159752192
+        "ru_maxrss_bytes": 214183936
       },
       "s3_requests": {
         "GET": 0,
@@ -135,16 +135,16 @@
       "engine": "polars",
       "query": "Q3_topn",
       "timing": {
-        "p50_ms": 1.166345,
-        "p95_ms": 1.166345,
-        "min_ms": 1.132536,
-        "max_ms": 1.166345
+        "p50_ms": 24.498656,
+        "p95_ms": 24.498656,
+        "min_ms": 19.31399,
+        "max_ms": 24.498656
       },
       "memory": {
-        "peak_rss_bytes": 157675520,
-        "peak_arrow_bytes": 0,
+        "peak_rss_bytes": 219074560,
+        "peak_arrow_bytes": 645440,
         "peak_python_heap_bytes": 0,
-        "ru_maxrss_bytes": 159752192
+        "ru_maxrss_bytes": 219410432
       },
       "s3_requests": {
         "GET": 0,
@@ -159,16 +159,16 @@
       "engine": "duckdb",
       "query": "Q1_point",
       "timing": {
-        "p50_ms": 1.18443,
-        "p95_ms": 1.18443,
-        "min_ms": 1.110534,
-        "max_ms": 1.18443
+        "p50_ms": 21.24856,
+        "p95_ms": 21.24856,
+        "min_ms": 21.109021,
+        "max_ms": 21.24856
       },
       "memory": {
-        "peak_rss_bytes": 157540352,
-        "peak_arrow_bytes": 0,
+        "peak_rss_bytes": 190472192,
+        "peak_arrow_bytes": 645440,
         "peak_python_heap_bytes": 0,
-        "ru_maxrss_bytes": 159752192
+        "ru_maxrss_bytes": 191520768
       },
       "s3_requests": {
         "GET": 0,
@@ -183,16 +183,16 @@
       "engine": "duckdb",
       "query": "Q2_range_agg",
       "timing": {
-        "p50_ms": 1.166653,
-        "p95_ms": 1.166653,
-        "min_ms": 1.107713,
-        "max_ms": 1.166653
+        "p50_ms": 20.986153,
+        "p95_ms": 20.986153,
+        "min_ms": 20.65742,
+        "max_ms": 20.986153
       },
       "memory": {
-        "peak_rss_bytes": 157159424,
-        "peak_arrow_bytes": 0,
+        "peak_rss_bytes": 192720896,
+        "peak_arrow_bytes": 645440,
         "peak_python_heap_bytes": 0,
-        "ru_maxrss_bytes": 159752192
+        "ru_maxrss_bytes": 192720896
       },
       "s3_requests": {
         "GET": 0,
@@ -207,16 +207,16 @@
       "engine": "duckdb",
       "query": "Q3_topn",
       "timing": {
-        "p50_ms": 1.149119,
-        "p95_ms": 1.149119,
-        "min_ms": 1.11418,
-        "max_ms": 1.149119
+        "p50_ms": 27.502814,
+        "p95_ms": 27.502814,
+        "min_ms": 27.200441,
+        "max_ms": 27.502814
       },
       "memory": {
-        "peak_rss_bytes": 157798400,
-        "peak_arrow_bytes": 0,
+        "peak_rss_bytes": 202383360,
+        "peak_arrow_bytes": 645440,
         "peak_python_heap_bytes": 0,
-        "ru_maxrss_bytes": 159752192
+        "ru_maxrss_bytes": 202383360
       },
       "s3_requests": {
         "GET": 0,
@@ -231,16 +231,16 @@
       "engine": "polars",
       "query": "Q1_point",
       "timing": {
-        "p50_ms": 1.130903,
-        "p95_ms": 1.130903,
-        "min_ms": 1.104193,
-        "max_ms": 1.130903
+        "p50_ms": 5.990987,
+        "p95_ms": 5.990987,
+        "min_ms": 4.96656,
+        "max_ms": 5.990987
       },
       "memory": {
-        "peak_rss_bytes": 157548544,
-        "peak_arrow_bytes": 0,
+        "peak_rss_bytes": 209870848,
+        "peak_arrow_bytes": 645440,
         "peak_python_heap_bytes": 0,
-        "ru_maxrss_bytes": 159752192
+        "ru_maxrss_bytes": 212340736
       },
       "s3_requests": {
         "GET": 0,
@@ -255,16 +255,16 @@
       "engine": "polars",
       "query": "Q2_range_agg",
       "timing": {
-        "p50_ms": 1.096926,
-        "p95_ms": 1.096926,
-        "min_ms": 1.093461,
-        "max_ms": 1.096926
+        "p50_ms": 6.918639,
+        "p95_ms": 6.918639,
+        "min_ms": 6.555747,
+        "max_ms": 6.918639
       },
       "memory": {
-        "peak_rss_bytes": 157024256,
-        "peak_arrow_bytes": 0,
+        "peak_rss_bytes": 209903616,
+        "peak_arrow_bytes": 645440,
         "peak_python_heap_bytes": 0,
-        "ru_maxrss_bytes": 159752192
+        "ru_maxrss_bytes": 210391040
       },
       "s3_requests": {
         "GET": 0,
@@ -279,16 +279,16 @@
       "engine": "polars",
       "query": "Q3_topn",
       "timing": {
-        "p50_ms": 1.182524,
-        "p95_ms": 1.182524,
-        "min_ms": 1.110761,
-        "max_ms": 1.182524
+        "p50_ms": 10.873951,
+        "p95_ms": 10.873951,
+        "min_ms": 10.601431,
+        "max_ms": 10.873951
       },
       "memory": {
-        "peak_rss_bytes": 157683712,
-        "peak_arrow_bytes": 0,
+        "peak_rss_bytes": 219516928,
+        "peak_arrow_bytes": 645440,
         "peak_python_heap_bytes": 0,
-        "ru_maxrss_bytes": 159752192
+        "ru_maxrss_bytes": 221220864
       },
       "s3_requests": {
         "GET": 0,
@@ -303,16 +303,16 @@
       "engine": "duckdb",
       "query": "Q1_point",
       "timing": {
-        "p50_ms": 1.105755,
-        "p95_ms": 1.105755,
-        "min_ms": 1.094774,
-        "max_ms": 1.105755
+        "p50_ms": 117.732328,
+        "p95_ms": 117.732328,
+        "min_ms": 105.590433,
+        "max_ms": 117.732328
       },
       "memory": {
-        "peak_rss_bytes": 157687808,
-        "peak_arrow_bytes": 0,
+        "peak_rss_bytes": 254996480,
+        "peak_arrow_bytes": 12050432,
         "peak_python_heap_bytes": 0,
-        "ru_maxrss_bytes": 159752192
+        "ru_maxrss_bytes": 254996480
       },
       "s3_requests": {
         "GET": 0,
@@ -327,16 +327,16 @@
       "engine": "duckdb",
       "query": "Q2_range_agg",
       "timing": {
-        "p50_ms": 1.124791,
-        "p95_ms": 1.124791,
-        "min_ms": 1.09703,
-        "max_ms": 1.124791
+        "p50_ms": 262.79388,
+        "p95_ms": 262.79388,
+        "min_ms": 114.983587,
+        "max_ms": 262.79388
       },
       "memory": {
-        "peak_rss_bytes": 157151232,
-        "peak_arrow_bytes": 0,
+        "peak_rss_bytes": 267341824,
+        "peak_arrow_bytes": 12050432,
         "peak_python_heap_bytes": 0,
-        "ru_maxrss_bytes": 159752192
+        "ru_maxrss_bytes": 267472896
       },
       "s3_requests": {
         "GET": 0,
@@ -351,16 +351,16 @@
       "engine": "duckdb",
       "query": "Q3_topn",
       "timing": {
-        "p50_ms": 1.141728,
-        "p95_ms": 1.141728,
-        "min_ms": 1.122009,
-        "max_ms": 1.141728
+        "p50_ms": 76.34495,
+        "p95_ms": 76.34495,
+        "min_ms": 71.703261,
+        "max_ms": 76.34495
       },
       "memory": {
-        "peak_rss_bytes": 157679616,
-        "peak_arrow_bytes": 0,
+        "peak_rss_bytes": 260902912,
+        "peak_arrow_bytes": 12050432,
         "peak_python_heap_bytes": 0,
-        "ru_maxrss_bytes": 159752192
+        "ru_maxrss_bytes": 260902912
       },
       "s3_requests": {
         "GET": 0,
@@ -375,16 +375,16 @@
       "engine": "polars",
       "query": "Q1_point",
       "timing": {
-        "p50_ms": 1.113385,
-        "p95_ms": 1.113385,
-        "min_ms": 1.101422,
-        "max_ms": 1.113385
+        "p50_ms": 30.484027,
+        "p95_ms": 30.484027,
+        "min_ms": 28.771105,
+        "max_ms": 30.484027
       },
       "memory": {
-        "peak_rss_bytes": 157429760,
-        "peak_arrow_bytes": 0,
+        "peak_rss_bytes": 226648064,
+        "peak_arrow_bytes": 1289280,
         "peak_python_heap_bytes": 0,
-        "ru_maxrss_bytes": 159752192
+        "ru_maxrss_bytes": 229924864
       },
       "s3_requests": {
         "GET": 0,
@@ -399,16 +399,16 @@
       "engine": "polars",
       "query": "Q2_range_agg",
       "timing": {
-        "p50_ms": 1.106187,
-        "p95_ms": 1.106187,
-        "min_ms": 1.099057,
-        "max_ms": 1.106187
+        "p50_ms": 27.591857,
+        "p95_ms": 27.591857,
+        "min_ms": 25.997918,
+        "max_ms": 27.591857
       },
       "memory": {
-        "peak_rss_bytes": 156377088,
-        "peak_arrow_bytes": 0,
+        "peak_rss_bytes": 222797824,
+        "peak_arrow_bytes": 1289280,
         "peak_python_heap_bytes": 0,
-        "ru_maxrss_bytes": 159752192
+        "ru_maxrss_bytes": 224763904
       },
       "s3_requests": {
         "GET": 0,
@@ -423,16 +423,16 @@
       "engine": "polars",
       "query": "Q3_topn",
       "timing": {
-        "p50_ms": 1.14673,
-        "p95_ms": 1.14673,
-        "min_ms": 1.109384,
-        "max_ms": 1.14673
+        "p50_ms": 33.238745,
+        "p95_ms": 33.238745,
+        "min_ms": 30.53093,
+        "max_ms": 33.238745
       },
       "memory": {
-        "peak_rss_bytes": 157425664,
-        "peak_arrow_bytes": 0,
+        "peak_rss_bytes": 230916096,
+        "peak_arrow_bytes": 1289280,
         "peak_python_heap_bytes": 0,
-        "ru_maxrss_bytes": 159752192
+        "ru_maxrss_bytes": 231702528
       },
       "s3_requests": {
         "GET": 0,

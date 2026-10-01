@@ -206,6 +206,7 @@ class CatalogManager:
         if replayed_res is not None:
             return replayed_res
 
+        identifier = f"{self._settings.namespace}.{self._settings.table_name}"
         tbl = self.current_table()
         try:
             delete_set = set(delete)
@@ -230,8 +231,12 @@ class CatalogManager:
                 update_snap.append_data_file(data_file)
 
             tx.commit_transaction()
-            self._table = tbl
-            current_snap = tbl.current_snapshot()
+            if self._catalog is not None:
+                fresh_table = self._catalog.load_table(identifier)
+                self._table = fresh_table
+            else:
+                self._table = tbl
+            current_snap = self._table.current_snapshot()
             snap_id = current_snap.snapshot_id if current_snap else -1
             return CommitResult(
                 snapshot_id=snap_id,
