@@ -1,21 +1,21 @@
 # lakehouse-lite-engine
 
 [![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/downloads/release/python-3130/)
-[![PyIceberg 0.11+](https://img.shields.io/badge/PyIceberg-0.12.0-blue)](https://pyiceberg.apache.org/)
+[![PyIceberg 0.12+](https://img.shields.io/badge/PyIceberg-0.12.0-blue)](https://pyiceberg.apache.org/)
 [![Zero-JVM](https://img.shields.io/badge/JVM-Free-brightgreen.svg)](#1-executive-summary)
-[![RAM Ceiling < 500MB](https://img.shields.io/badge/RAM_Ceiling-%3C500MB-green.svg)](#35-performance-memory--cost-benchmark-harness)
+[![RAM Ceiling < 500MB](https://img.shields.io/badge/RAM_Ceiling-%3C500MB-green.svg)](#5-performance-memory--cost-benchmark-harness)
 [![Ruff](https://img.shields.io/badge/code_style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Mypy Strict](https://img.shields.io/badge/mypy-strict-blue.svg)](https://mypy.readthedocs.io/)
 [![CodeQL SAST](https://img.shields.io/badge/security-CodeQL-green.svg)](https://codeql.github.com/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 ---
 
 ## 1. Executive Summary
 
-`lakehouse-lite-engine` is a modular, zero-JVM, high-performance lakehouse engine built natively for **Python 3.13**. It replaces complex, resource-heavy Spark or Java-based warehouse query layers with a single-process embedded lakehouse pipeline that accepts JSON/NDJSON micro-batches and produces transactional Apache Iceberg snapshots.
+`lakehouse-lite-engine` is an embedded, zero-JVM transactional lakehouse engine written in pure **Python 3.13**. It provides high-throughput ingestion of JSON/NDJSON micro-batches into ACID-compliant Apache Iceberg tables, serving out-of-core analytical queries concurrently via **Polars** and **DuckDB**.
 
-Analytical queries are served concurrently via **Polars** and **DuckDB** through zero-copy Arrow C Data Interface PyCapsule transfers (`__arrow_c_stream__`). Operating within a hard process RSS RAM ceiling of **< 500 MB**, the engine is designed for edge deployments, microservices, and serverless containers that target local storage or AWS S3.
+By replacing JVM-bound infrastructure (PySpark, Py4J, Java runtimes) with native C-extension memory pools and zero-copy PyCapsule IPC transfers (`__arrow_c_stream__`), the engine operates within a strictly enforced **< 500 MB peak RSS RAM budget**, targeting resource-constrained containers, edge deployments, and serverless microservices on local disk or AWS S3.
 
 ---
 
@@ -59,11 +59,11 @@ Analytical queries are served concurrently via **Polars** and **DuckDB** through
 
 ### Physical Design Trade-offs
 
-| Design Axis | Legacy Lakehouse Architecture | `lakehouse-lite-engine` Design | Benefit / Impact |
+| Design Axis | Traditional JVM Lakehouse | `lakehouse-lite-engine` Architecture | Physical Performance Impact |
 |---|---|---|---|
-| **JVM Dependency** | Requires PySpark / Py4J / JPype | 100% Zero-JVM pure CExtension pipeline | Sub-second startup time, <120MB baseline RSS |
-| **Ingestion Memory** | Deserializes JSON to Python dicts/models | Fast-path Rust validation to Arrow RecordBatches | Prevents Python object heap bloat |
-| **Object Storage Cost** | Writes thousands of small Parquet files | In-memory 128MB compaction buffer before commit | Reduces S3 PUT/LIST requests by > 99% |
+| **JVM Footprint** | PySpark / Py4J / JPype dependencies | 100% Zero-JVM native C-extension pipeline | < 120 MB idle RSS baseline; zero JVM warmup delay |
+| **Ingestion Pipeline** | Python dict / model object allocation | Fast-pass Rust validation directly to Arrow batches | Eliminates Python object heap overhead |
+| **Object Storage Cost** | Frequent uncompacted small Parquet writes | In-memory 128 MB compaction buffer prior to commit | Reduces S3 PUT/LIST API requests by > 99% |
 | **Cross-Engine Transfer** | Inter-process IPC or Pandas conversion | In-process Arrow PyCapsule (`__arrow_c_stream__`) | Zero-copy, 0% CPU serialization overhead |
 
 ---
@@ -71,9 +71,9 @@ Analytical queries are served concurrently via **Polars** and **DuckDB** through
 ## 3. Core Subsystem Deep Dives
 
 ### 3.1 Ingestion & Validation (`ingestion`)
-* **Schema Authority**: `src/lakehouse_engine/ingestion/schema.py` defines `EVENTS_ARROW_SCHEMA` as the single source of truth for table structure.
+* **Schema Authority**: `src/lakehouse_engine/ingestion/schema.py` defines `EVENTS_ARROW_SCHEMA` as the single source of truth.
 * **Fast-Path Validation**: `MicroBatchValidator` executes single-pass Rust validation via `EVENT_LIST_ADAPTER.validate_json` directly on raw byte arrays.
-* **Isolation Path & DLQ**: On validation error, batch lines are isolated individually. Invalid records are routed to `NdjsonDeadLetterSink` under `<dlq_dir>/dlq-<YYYYMMDD>-<seq:05d>.ndjson` with reason metadata (`validation`, `schema_drift`, `malformed_json`, `oversize`). Path traversal safety is enforced.
+* **Isolation Path & DLQ**: On validation error, batch lines are isolated individually. Invalid records route to `NdjsonDeadLetterSink` under `<dlq_dir>/dlq-<YYYYMMDD>-<seq:05d>.ndjson` with reason metadata (`validation`, `schema_drift`, `malformed_json`, `oversize`). Path traversal safety is enforced.
 * **Circuit Breaker**: If reject ratio exceeds `max_reject_ratio` (default `0.5`) after `reject_ratio_min_sample` (default `1,000`), a `DeadLetterThresholdExceeded` exception is raised.
 
 ### 3.2 Compaction Buffer (`buffer`)
@@ -97,14 +97,14 @@ Analytical queries are served concurrently via **Polars** and **DuckDB** through
 
 ## 4. Installation & Quickstart Guide
 
-### Prerequisites
+### System Prerequisites
 * **Python**: `>= 3.13, < 3.14`
 * **Package Manager**: `uv`
 
-### Installation
+### Installation Commands
 
 ```bash
-# Clone the repository
+# Clone repository
 git clone https://github.com/Ali-datasmith/lakehouse-lite-engine.git
 cd lakehouse-lite-engine
 
@@ -131,7 +131,7 @@ settings = EngineSettings.load(
     },
 )
 
-# 2. Run Ingestion, Flush, and Query Pipeline
+# 2. Execute Ingest, Flush, Commit, and Query Cycle
 with LakehouseEngine(settings) as engine:
     events = [
         {
@@ -146,15 +146,17 @@ with LakehouseEngine(settings) as engine:
 
     # Ingest micro-batch
     vbatch = engine.ingest(raw_bytes, source="quickstart_stream", source_offset=1)
-    print(f"Accepted: {vbatch.accepted}, Rejected: {vbatch.rejected}")
+    if vbatch is not None:
+        print(f"Accepted: {vbatch.accepted}, Rejected: {vbatch.rejected}")
 
     # Flush buffer to Parquet and commit Iceberg snapshot
     commit = engine.flush()
-    print(f"Committed snapshot {commit.snapshot_id} with {commit.added_rows} rows")
+    if commit is not None:
+        print(f"Committed snapshot {commit.snapshot_id} with {commit.added_rows} rows")
 
     # Query with Polars (LazyFrame)
     lf = engine.query.polars_lazy()
-    df = lf.filter(engine.query.polars_adapter.pl.col("event_name") == "purchase").collect(engine="streaming")
+    df = lf.collect(engine="streaming")
     print("Polars Query Result:")
     print(df)
 
@@ -216,7 +218,7 @@ uv run python -m lakehouse_engine.benchmarks --rows 100000 --runs 2 --out ./benc
 * `tests/property/test_properties.py`: Hypothesis property tests for Arrow schema and conversion invariants.
 * `tests/memory/test_memory.py`: RSS-gated memory limit tests (`MT-01` through `MT-05`) verifying <500 MB peak RAM.
 * `tests/integration/test_pipeline.py`: Full end-to-end ingest -> flush -> commit -> query -> compact cycle.
-* `tests/test_no_legacy.py`: AST AST scanner enforcing `G-LEGACY` zero-legacy rules.
+* `tests/test_no_legacy.py`: AST scanner enforcing `G-LEGACY` zero-legacy rules.
 
 ---
 
@@ -237,7 +239,7 @@ Vulnerabilities are managed according to [`SECURITY.md`](SECURITY.md). Reports r
 ## 8. License & Author Contacts
 
 ### License
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [Apache-2.0 License](LICENSE).
 
 ### Maintainer Profile & Contacts
 
