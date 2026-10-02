@@ -1,12 +1,13 @@
 # src/lakehouse_engine/catalog/manager.py
 import contextlib
+import logging
 import random
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass
 from fcntl import LOCK_EX, LOCK_NB, flock
 from pathlib import Path
-from typing import TYPE_CHECKING, TextIO
+from typing import TYPE_CHECKING, NoReturn, TextIO
 
 from pyiceberg.catalog import Catalog, load_catalog
 from pyiceberg.exceptions import CommitFailedException
@@ -20,6 +21,8 @@ from lakehouse_engine.ingestion.schema import EVENTS_ARROW_SCHEMA
 if TYPE_CHECKING:
     from lakehouse_engine.buffer.buffer import FlushedFile
     from lakehouse_engine.config import CatalogSettings, StorageSettings
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,7 +50,7 @@ class CatalogManager:
         """
         # SQLite single-writer lock check
         if self._settings.uri.startswith("sqlite:"):
-            db_path_str = self._settings.uri.replace("sqlite:///", "")
+            db_path_str = self._settings.uri.replace("sqlite:///", "").replace("sqlite://", "")
             lock_path = Path(db_path_str + ".lock").resolve()
             lock_path.parent.mkdir(parents=True, exist_ok=True)
             try:
@@ -98,11 +101,10 @@ class CatalogManager:
         except Exception as exc:
             if isinstance(exc, (CatalogConnectionError, CatalogCommitError)):
                 raise
-            raise CatalogConnectionError(
-                f"Failed to initialize catalog or table: {exc}"
-            ) from exc
+            raise CatalogConnectionError(f"Failed to initialize catalog or table: {exc}") from exc
 
         assert_compatible(self._table.schema(), EVENTS_ARROW_SCHEMA)
+        logger.info("Catalog opened successfully for table %s", self._settings.table_name)
 
     @property
     def table(self) -> Table:
@@ -127,6 +129,7 @@ class CatalogManager:
         tbl = self.current_table()
         for snap in tbl.metadata.snapshots:
             if snap.summary and snap.summary.additional_properties.get("lhe.flush-id") == flush_id:
+                logger.info("Replayed idempotent flush_id %s", flush_id)
                 return CommitResult(
                     snapshot_id=snap.snapshot_id,
                     flush_id=flush_id,
@@ -139,7 +142,7 @@ class CatalogManager:
 
     def commit_files(self, files: Sequence["FlushedFile"], *, flush_id: str) -> CommitResult:
         if not files:
-            raise ValueError("No files provided to commit.")
+            raise CatalogCommitError("No files provided to commit.")
 
         replayed_res = self._check_idempotency(flush_id)
         if replayed_res is not None:
@@ -170,6 +173,12 @@ class CatalogManager:
                 self._table = fresh_table
                 current_snap = fresh_table.current_snapshot()
                 snap_id = current_snap.snapshot_id if current_snap else -1
+                logger.info(
+                    "Committed %d files (flush_id: %s) on attempt %d",
+                    len(files),
+                    flush_id,
+                    attempt,
+                )
                 return CommitResult(
                     snapshot_id=snap_id,
                     flush_id=flush_id,
@@ -179,6 +188,9 @@ class CatalogManager:
                     replayed=False,
                 )
             except CommitFailedException:
+                logger.warning(
+                    "Commit failed due to concurrent modification on attempt %d", attempt
+                )
                 if attempt == self._settings.commit_max_attempts:
                     break
                 jitter = random.uniform(0.5, 1.5)  # noqa: S311
@@ -193,6 +205,13 @@ class CatalogManager:
         raise CatalogCommitError(
             f"Commit exhausted {self._settings.commit_max_attempts} attempts.",
             context={"pending_files": file_paths, "flush_id": flush_id},
+        )
+
+    def _raise_missing_delete_paths(self, missing: set[str]) -> NoReturn:
+        msg = f"Compaction replace failed: delete paths not found in metadata: {missing}"
+        raise CatalogCommitError(
+            msg,
+            context={"missing_delete_paths": list(missing)},
         )
 
     def commit_replace(
@@ -211,10 +230,12 @@ class CatalogManager:
         try:
             delete_set = set(delete)
             matching_data_files = [
-                task.file
-                for task in tbl.scan().plan_files()
-                if task.file.file_path in delete_set
+                task.file for task in tbl.scan().plan_files() if task.file.file_path in delete_set
             ]
+
+            if len(matching_data_files) != len(delete_set):
+                missing = delete_set - {df.file_path for df in matching_data_files}
+                self._raise_missing_delete_paths(missing)
 
             tx = tbl.transaction()
             update_snap = tx.update_snapshot(
@@ -247,6 +268,8 @@ class CatalogManager:
                 replayed=False,
             )
         except Exception as exc:
+            if isinstance(exc, CatalogCommitError):
+                raise
             raise CatalogCommitError(
                 f"Compaction replace commit failed: {exc}",
                 context={"delete_paths": list(delete), "add_paths": list(add_paths)},
@@ -255,7 +278,6 @@ class CatalogManager:
     def close(self) -> None:
         if self._catalog is not None:
             with contextlib.suppress(Exception):
-                # Close underlying PyIceberg catalog connection if present
                 if hasattr(self._catalog, "close"):
                     self._catalog.close()
                 elif hasattr(self._catalog, "_session"):

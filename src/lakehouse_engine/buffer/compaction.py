@@ -1,5 +1,6 @@
 # src/lakehouse_engine/buffer/compaction.py
 import contextlib
+import logging
 import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -7,16 +8,18 @@ from typing import TYPE_CHECKING
 import pyarrow as pa
 import pyarrow.fs as pafs
 import pyarrow.parquet as pq
-from pyiceberg.io.pyarrow import schema_to_pyarrow
 
 from lakehouse_engine.catalog.storage import resolve_filesystem
 from lakehouse_engine.exceptions import CompactionError
 from lakehouse_engine.governor import Mode
+from lakehouse_engine.ingestion.schema import EVENTS_ARROW_SCHEMA
 
 if TYPE_CHECKING:
     from lakehouse_engine.catalog.manager import CatalogManager, CommitResult
     from lakehouse_engine.config import BufferSettings, CompactionSettings
     from lakehouse_engine.governor import ResourceGovernor
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,6 +68,8 @@ class Compactor:
         if len(small_files) < self._settings.min_input_files:
             return None
 
+        # Sort candidate small files deterministically by size, then path
+        small_files.sort(key=lambda f: (f[1], f[0]))
         small_files = small_files[: self._settings.max_input_files_per_run]
 
         input_paths = tuple(f[0] for f in small_files)
@@ -90,7 +95,7 @@ class Compactor:
             accumulated_bytes = 0
             accumulated_rows = 0
 
-            arrow_schema = schema_to_pyarrow(self._catalog.table.schema())
+            arrow_schema = EVENTS_ARROW_SCHEMA
 
             def flush_accumulator(writer: pq.ParquetWriter) -> None:
                 nonlocal accumulator, accumulated_bytes, accumulated_rows
@@ -115,7 +120,7 @@ class Compactor:
 
                     for batch in parquet_file.iter_batches(
                         batch_size=self._settings.read_batch_rows,
-                        use_threads=False,
+                        use_threads=self._settings.use_threads,
                     ):
                         b_bytes = batch.get_total_buffer_size()
                         self._governor.check(incoming_bytes=b_bytes)
@@ -179,6 +184,13 @@ class Compactor:
                     delete=plan.input_paths,
                     add_paths=output_paths,
                     flush_id=flush_id,
+                )
+
+                logger.info(
+                    "Compaction finished: merged %d files (%d rows) into %d files",
+                    len(plan.input_paths),
+                    output_rows_total,
+                    len(output_paths),
                 )
 
                 return CompactionResult(

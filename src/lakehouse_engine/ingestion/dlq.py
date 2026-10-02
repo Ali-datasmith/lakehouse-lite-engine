@@ -1,6 +1,6 @@
 # src/lakehouse_engine/ingestion/dlq.py
-import os
-from datetime import UTC, datetime
+import logging
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Protocol
 
@@ -10,6 +10,8 @@ from lakehouse_engine.exceptions import DeadLetterWriteError
 
 if TYPE_CHECKING:
     from lakehouse_engine.config import IngestionSettings
+
+logger = logging.getLogger(__name__)
 
 
 class DeadLetter(BaseModel):
@@ -37,8 +39,8 @@ class NdjsonDeadLetterSink:
     """Appends one JSON object per line to <dlq_dir>/dlq-<YYYYMMDD>-<seq:05d>.ndjson.
 
     In-memory staging <= 1 MB; rotates at dlq_rotate_bytes; fsync on flush()/close().
-    dlq_dir is created with mode 0o700. Paths are resolved and MUST stay under dlq_dir
-    (raise DeadLetterWriteError on traversal).
+    dlq_dir is created with explicit chmod 0o700. Paths are resolved and MUST stay under dlq_dir.
+    Enforces retention days and maximum total disk byte limits.
     """
 
     def __init__(self, settings: "IngestionSettings") -> None:
@@ -46,6 +48,7 @@ class NdjsonDeadLetterSink:
         self._dlq_dir = settings.dlq_dir.resolve()
         try:
             self._dlq_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+            self._dlq_dir.chmod(0o700)
         except Exception as exc:
             raise DeadLetterWriteError(
                 f"Failed to create DLQ directory {self._dlq_dir}: {exc}"
@@ -72,6 +75,41 @@ class NdjsonDeadLetterSink:
                 return target
             self._seq += 1
 
+    def enforce_retention_and_limits(self) -> None:
+        """Deletes files older than retention days and enforces max total bytes usage."""
+        try:
+            files = sorted(
+                [f for f in self._dlq_dir.glob("dlq-*.ndjson") if f.is_file()],
+                key=lambda p: p.stat().st_mtime,
+            )
+            now = datetime.now(UTC)
+            retention_cutoff = now - timedelta(days=self._settings.dlq_retention_days)
+
+            remaining_files: list[tuple[Path, int]] = []
+            for f in files:
+                mtime = datetime.fromtimestamp(f.stat().st_mtime, tz=UTC)
+                if mtime < retention_cutoff:
+                    logger.info("Deleting expired DLQ file: %s", f)
+                    f.unlink(missing_ok=True)
+                else:
+                    remaining_files.append((f, f.stat().st_size))
+
+            total_bytes = sum(sz for _, sz in remaining_files)
+            max_bytes = self._settings.dlq_max_total_bytes
+
+            while total_bytes > max_bytes and remaining_files:
+                oldest_file, size = remaining_files.pop(0)
+                logger.info(
+                    "Deleting oldest DLQ file to enforce max total bytes limit (%d > %d): %s",
+                    total_bytes,
+                    max_bytes,
+                    oldest_file,
+                )
+                oldest_file.unlink(missing_ok=True)
+                total_bytes -= size
+        except Exception as exc:
+            logger.error("Failed to enforce DLQ retention limits: %s", exc, exc_info=True)
+
     def write(self, record: DeadLetter) -> None:
         try:
             line_bytes = record.model_dump_json().encode("utf-8") + b"\n"
@@ -97,6 +135,8 @@ class NdjsonDeadLetterSink:
                 for chunk in self._buffer:
                     f.write(chunk)
                 f.flush()
+                import os
+
                 os.fsync(f.fileno())
 
             self._buffer.clear()
@@ -104,6 +144,8 @@ class NdjsonDeadLetterSink:
 
             if file_path.exists() and file_path.stat().st_size >= self._settings.dlq_rotate_bytes:
                 self._seq += 1
+
+            self.enforce_retention_and_limits()
         except Exception as exc:
             raise DeadLetterWriteError(f"Failed to flush DLQ to {file_path}: {exc}") from exc
 
