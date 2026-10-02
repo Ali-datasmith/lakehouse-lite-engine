@@ -189,9 +189,7 @@ def _execute_iceberg(engine: str, query: str, tmp_path: Path) -> None:
                 run_q3_topn_polars(lf_iceberg)
 
 
-def _execute_scenario(
-    layout: str, engine: str, query: str, tmp_path: Path, data_dir: Path
-) -> None:
+def _execute_scenario(layout: str, engine: str, query: str, tmp_path: Path, data_dir: Path) -> None:
     if layout == "csv":
         _execute_csv(engine, query, data_dir)
     elif layout == "raw_parquet":
