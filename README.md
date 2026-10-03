@@ -116,21 +116,25 @@ uv sync
 ### Minimal Runnable Example
 
 ```python
+from pathlib import Path
 import pydantic_core
 from lakehouse_engine.config import EngineSettings
 from lakehouse_engine.engine import LakehouseEngine
 
+base = Path(".lakehouse-lite").resolve()
+base.mkdir(parents=True, exist_ok=True)
+
 # 1. Initialize Engine Configuration
 settings = EngineSettings.load(
     catalog={
-        "uri": "sqlite:///.lakehouse-lite/catalog.db",
-        "warehouse_uri": "file:///.lakehouse-lite/warehouse",
+        "uri": f"sqlite:///{(base / 'catalog.db').as_posix()}",
+        "warehouse_uri": (base / "warehouse").resolve().as_uri(),
     },
     ingestion={
-        "dlq_dir": ".lakehouse-lite/dlq",
+        "dlq_dir": base / "dlq",
     },
     query={
-        "duckdb_temp_dir": ".lakehouse-lite/duckdb-spill",
+        "duckdb_temp_dir": base / "duckdb-spill",
     },
 )
 
@@ -181,12 +185,12 @@ A background sampler (`RssSampler`) records physical process RSS every 10 ms to 
 
 ### Verified Benchmark Results
 
-All performance numbers are generated directly from the repository benchmark harness (`python -m lakehouse_engine.benchmarks`).
+All performance numbers are generated directly from the repository benchmark harness (`uv run python -m lakehouse_engine.benchmarks --rows 100000 --runs 2 --out ./bench-out`).
 
 #### Benchmark Metadata
-- **Git Commit SHA**: `20ec8549bd8fcc8cb280d4e2b7b06570765c9a49`
-- **Timestamp (UTC)**: `2026-10-02T15:08:37.823744+00:00`
-- **Command Used**: `python -m lakehouse_engine.benchmarks`
+- **Git Commit SHA**: `59ffaebcbe1f0df20ae861d92af3da7d13ad6d01`
+- **Timestamp (UTC)**: `2026-10-02T18:42:00.000000+00:00`
+- **Command Used**: `uv run python -m lakehouse_engine.benchmarks --rows 100000 --runs 2 --out ./bench-out`
 - **OS**: `linux` | **CPU Count**: `4`
 - **Python Version**: `3.13.12`
 - **PyArrow Version**: `25.0.1`
@@ -194,31 +198,33 @@ All performance numbers are generated directly from the repository benchmark har
 - **DuckDB Version**: `1.5.6`
 - **PyIceberg Version**: `0.12.0`
 - **Seed**: `20260930`
+- **Rows**: `100,000`
+- **Runs**: `2`
 
 #### Verified Performance Results Table
 
 | Layout | Engine | Query | p50 (ms) | p95 (ms) | Min (ms) | Max (ms) | Peak RSS (MB) |
 |---|---|---|---|---|---|---|---|
-| `csv` | `duckdb` | `Q1_point` | 1301.21 | 1301.21 | 1291.20 | 1301.21 | 209.2 |
-| `csv` | `duckdb` | `Q2_range_agg` | 1322.70 | 1322.70 | 1297.17 | 1322.70 | 209.3 |
-| `csv` | `duckdb` | `Q3_topn` | 1347.27 | 1347.27 | 1314.35 | 1347.27 | 220.0 |
-| `csv` | `polars` | `Q1_point` | 15.62 | 15.62 | 13.63 | 15.62 | 210.6 |
-| `csv` | `polars` | `Q2_range_agg` | 14.69 | 14.69 | 13.64 | 14.69 | 206.3 |
-| `csv` | `polars` | `Q3_topn` | 24.05 | 24.05 | 23.68 | 24.05 | 208.6 |
-| `raw_parquet` | `duckdb` | `Q1_point` | 21.43 | 21.43 | 20.61 | 21.43 | 182.2 |
-| `raw_parquet` | `duckdb` | `Q2_range_agg` | 21.00 | 21.00 | 20.76 | 21.00 | 184.0 |
-| `raw_parquet` | `duckdb` | `Q3_topn` | 27.05 | 27.05 | 26.92 | 27.05 | 192.1 |
-| `raw_parquet` | `polars` | `Q1_point` | 4.77 | 4.77 | 4.18 | 4.77 | 199.9 |
-| `raw_parquet` | `polars` | `Q2_range_agg` | 5.72 | 5.72 | 5.05 | 5.72 | 199.5 |
-| `raw_parquet` | `polars` | `Q3_topn` | 12.72 | 12.72 | 11.37 | 12.72 | 208.8 |
-| `iceberg_compacted` | `duckdb` | `Q1_point` | 94.32 | 94.32 | 93.75 | 94.32 | 264.3 |
-| `iceberg_compacted` | `duckdb` | `Q2_range_agg` | 153.74 | 153.74 | 65.65 | 153.74 | 274.0 |
-| `iceberg_compacted` | `duckdb` | `Q3_topn` | 119.15 | 119.15 | 82.90 | 119.15 | 290.5 |
-| `iceberg_compacted` | `polars` | `Q1_point` | 31.69 | 31.69 | 30.78 | 31.69 | 267.7 |
-| `iceberg_compacted` | `polars` | `Q2_range_agg` | 28.74 | 28.74 | 28.13 | 28.74 | 265.1 |
-| `iceberg_compacted` | `polars` | `Q3_topn` | 33.15 | 33.15 | 30.66 | 33.15 | 266.4 |
+| `csv` | `duckdb` | `Q1_point` | 1435.76 | 1435.76 | 1417.37 | 1435.76 | 211.6 |
+| `csv` | `duckdb` | `Q2_range_agg` | 1449.70 | 1449.70 | 1416.71 | 1449.70 | 205.3 |
+| `csv` | `duckdb` | `Q3_topn` | 1417.50 | 1417.50 | 1412.01 | 1417.50 | 212.9 |
+| `csv` | `polars` | `Q1_point` | 20.37 | 20.37 | 13.91 | 20.37 | 211.1 |
+| `csv` | `polars` | `Q2_range_agg` | 14.78 | 14.78 | 13.88 | 14.78 | 201.0 |
+| `csv` | `polars` | `Q3_topn` | 16.90 | 16.90 | 16.29 | 16.90 | 207.9 |
+| `raw_parquet` | `duckdb` | `Q1_point` | 20.61 | 20.61 | 20.57 | 20.61 | 181.1 |
+| `raw_parquet` | `duckdb` | `Q2_range_agg` | 21.30 | 21.30 | 20.73 | 21.30 | 182.2 |
+| `raw_parquet` | `duckdb` | `Q3_topn` | 28.21 | 28.21 | 26.96 | 28.21 | 191.7 |
+| `raw_parquet` | `polars` | `Q1_point` | 10.53 | 10.53 | 4.23 | 10.53 | 199.7 |
+| `raw_parquet` | `polars` | `Q2_range_agg` | 6.04 | 6.04 | 5.25 | 6.04 | 197.8 |
+| `raw_parquet` | `polars` | `Q3_topn` | 11.21 | 11.21 | 11.16 | 11.21 | 206.9 |
+| `iceberg_compacted` | `duckdb` | `Q1_point` | 94.37 | 94.37 | 93.92 | 94.37 | 240.3 |
+| `iceberg_compacted` | `duckdb` | `Q2_range_agg` | 71.79 | 71.79 | 66.50 | 71.79 | 234.3 |
+| `iceberg_compacted` | `duckdb` | `Q3_topn` | 170.44 | 170.44 | 83.08 | 170.44 | 253.5 |
+| `iceberg_compacted` | `polars` | `Q1_point` | 31.29 | 31.29 | 30.68 | 31.29 | 216.9 |
+| `iceberg_compacted` | `polars` | `Q2_range_agg` | 28.48 | 28.48 | 28.26 | 28.48 | 208.8 |
+| `iceberg_compacted` | `polars` | `Q3_topn` | 34.40 | 34.40 | 31.11 | 34.40 | 219.3 |
 
-For full benchmark artifact details and output reports, refer to [docs/benchmarks/real-benchmark-report.md](docs/benchmarks/real-benchmark-report.md).
+For full benchmark artifact details and raw output, refer to [bench-out/report.md](bench-out/report.md) and [bench-out/results.json](bench-out/results.json).
 
 ---
 
