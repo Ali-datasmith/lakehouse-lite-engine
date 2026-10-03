@@ -5,6 +5,8 @@ from urllib.parse import urlparse
 
 import pyarrow.fs as pafs
 
+from lakehouse_engine.exceptions import ConfigurationError
+
 if TYPE_CHECKING:
     from lakehouse_engine.config import StorageSettings
 
@@ -48,4 +50,4 @@ def resolve_filesystem(
         rel_path = f"{parsed.netloc}{parsed.path}"
         return s3_fs, rel_path
 
-    raise ValueError(f"Unsupported storage scheme in URI: {uri}")
+    raise ConfigurationError(f"Unsupported storage scheme in URI: {uri}")

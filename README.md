@@ -63,7 +63,7 @@ By replacing JVM-bound infrastructure (PySpark, Py4J, Java runtimes) with native
 |---|---|---|---|
 | **JVM Footprint** | PySpark / Py4J / JPype dependencies | 100% Zero-JVM native C-extension pipeline | < 120 MB idle RSS baseline; zero JVM warmup delay |
 | **Ingestion Pipeline** | Python dict / model object allocation | Fast-pass Rust validation directly to Arrow batches | Eliminates Python object heap overhead |
-| **Object Storage Cost** | Frequent uncompacted small Parquet writes | In-memory 128 MB compaction buffer prior to commit | Reduces S3 PUT/LIST API requests by > 99% |
+| **Object Storage Cost** | Frequent uncompacted small Parquet writes | In-memory 128 MB compaction buffer prior to commit | Compacts small batches in-memory prior to Parquet flush to minimize metadata fragmentation and small-file proliferation |
 | **Cross-Engine Transfer** | Inter-process IPC or Pandas conversion | In-process Arrow PyCapsule (`__arrow_c_stream__`) | Zero-copy, 0% CPU serialization overhead |
 
 ---
@@ -123,11 +123,14 @@ from lakehouse_engine.engine import LakehouseEngine
 # 1. Initialize Engine Configuration
 settings = EngineSettings.load(
     catalog={
-        "uri": "sqlite:///catalog.db",
-        "warehouse_uri": "file:///tmp/warehouse",
+        "uri": "sqlite:///.lakehouse-lite/catalog.db",
+        "warehouse_uri": "file:///.lakehouse-lite/warehouse",
     },
     ingestion={
-        "dlq_dir": "/tmp/lhe/dlq",
+        "dlq_dir": ".lakehouse-lite/dlq",
+    },
+    query={
+        "duckdb_temp_dir": ".lakehouse-lite/duckdb-spill",
     },
 )
 
@@ -154,9 +157,8 @@ with LakehouseEngine(settings) as engine:
     if commit is not None:
         print(f"Committed snapshot {commit.snapshot_id} with {commit.added_rows} rows")
 
-    # Query with Polars (LazyFrame)
-    lf = engine.query.polars_lazy()
-    df = lf.collect(engine="streaming")
+    # Query with Polars (DataFrame collected under lease governance)
+    df = engine.query.collect_polars()
     print("Polars Query Result:")
     print(df)
 
@@ -173,20 +175,50 @@ with LakehouseEngine(settings) as engine:
 ## 5. Performance, Memory & Cost Benchmark Harness
 
 ### Benchmarking Methodology
-The benchmark harness (`python -m lakehouse_engine.benchmarks`) uses process isolation (`multiprocessing.get_context("spawn")`) to measure query latency, memory consumption, and mock S3 request counts across three physical layouts: `csv` (sharded CSVs), `raw_parquet` (small 10k-row Parquet files), and `iceberg_compacted` (compacted 128MB Parquet files registered in Iceberg).
+The benchmark harness (`python -m lakehouse_engine.benchmarks`) uses process isolation (`multiprocessing.get_context("spawn")`) to measure query latency and memory consumption across three physical layouts: `csv` (sharded CSVs), `raw_parquet` (small 10k-row Parquet files), and `iceberg_compacted` (compacted Parquet files registered in Iceberg).
 
 A background sampler (`RssSampler`) records physical process RSS every 10 ms to enforce the **500 MB peak RAM limit**.
 
-### Comparison Table (Representative Benchmark Results)
+### Verified Benchmark Results
 
-| Layout | Query Engine | Query Workload | p50 Latency (ms) | p95 Latency (ms) | Peak RSS (MB) | Est. S3 Requests / 1k Queries |
-|---|---|---|---|---|---|---|
-| `csv` | DuckDB | `Q2_range_agg` | 42.10 | 48.50 | 185.2 | 10,000 GETs |
-| `csv` | Polars | `Q2_range_agg` | 38.60 | 44.20 | 192.4 | 10,000 GETs |
-| `raw_parquet` | DuckDB | `Q2_range_agg` | 18.30 | 22.10 | 142.1 | 1,000 GETs |
-| `raw_parquet` | Polars | `Q2_range_agg` | 15.40 | 19.80 | 148.6 | 1,000 GETs |
-| **`iceberg_compacted`** | **DuckDB** | **`Q2_range_agg`** | **4.20** | **5.80** | **132.5** | **10 GETs (>99% savings)** |
-| **`iceberg_compacted`** | **Polars** | **`Q2_range_agg`** | **3.80** | **5.10** | **138.0** | **10 GETs (>99% savings)** |
+All performance numbers are generated directly from the repository benchmark harness (`python -m lakehouse_engine.benchmarks`).
+
+#### Benchmark Metadata
+- **Git Commit SHA**: `20ec8549bd8fcc8cb280d4e2b7b06570765c9a49`
+- **Timestamp (UTC)**: `2026-10-02T15:08:37.823744+00:00`
+- **Command Used**: `python -m lakehouse_engine.benchmarks`
+- **OS**: `linux` | **CPU Count**: `4`
+- **Python Version**: `3.13.12`
+- **PyArrow Version**: `25.0.1`
+- **Polars Version**: `1.44.2`
+- **DuckDB Version**: `1.5.6`
+- **PyIceberg Version**: `0.12.0`
+- **Seed**: `20260930`
+
+#### Verified Performance Results Table
+
+| Layout | Engine | Query | p50 (ms) | p95 (ms) | Min (ms) | Max (ms) | Peak RSS (MB) |
+|---|---|---|---|---|---|---|---|
+| `csv` | `duckdb` | `Q1_point` | 1301.21 | 1301.21 | 1291.20 | 1301.21 | 209.2 |
+| `csv` | `duckdb` | `Q2_range_agg` | 1322.70 | 1322.70 | 1297.17 | 1322.70 | 209.3 |
+| `csv` | `duckdb` | `Q3_topn` | 1347.27 | 1347.27 | 1314.35 | 1347.27 | 220.0 |
+| `csv` | `polars` | `Q1_point` | 15.62 | 15.62 | 13.63 | 15.62 | 210.6 |
+| `csv` | `polars` | `Q2_range_agg` | 14.69 | 14.69 | 13.64 | 14.69 | 206.3 |
+| `csv` | `polars` | `Q3_topn` | 24.05 | 24.05 | 23.68 | 24.05 | 208.6 |
+| `raw_parquet` | `duckdb` | `Q1_point` | 21.43 | 21.43 | 20.61 | 21.43 | 182.2 |
+| `raw_parquet` | `duckdb` | `Q2_range_agg` | 21.00 | 21.00 | 20.76 | 21.00 | 184.0 |
+| `raw_parquet` | `duckdb` | `Q3_topn` | 27.05 | 27.05 | 26.92 | 27.05 | 192.1 |
+| `raw_parquet` | `polars` | `Q1_point` | 4.77 | 4.77 | 4.18 | 4.77 | 199.9 |
+| `raw_parquet` | `polars` | `Q2_range_agg` | 5.72 | 5.72 | 5.05 | 5.72 | 199.5 |
+| `raw_parquet` | `polars` | `Q3_topn` | 12.72 | 12.72 | 11.37 | 12.72 | 208.8 |
+| `iceberg_compacted` | `duckdb` | `Q1_point` | 94.32 | 94.32 | 93.75 | 94.32 | 264.3 |
+| `iceberg_compacted` | `duckdb` | `Q2_range_agg` | 153.74 | 153.74 | 65.65 | 153.74 | 274.0 |
+| `iceberg_compacted` | `duckdb` | `Q3_topn` | 119.15 | 119.15 | 82.90 | 119.15 | 290.5 |
+| `iceberg_compacted` | `polars` | `Q1_point` | 31.69 | 31.69 | 30.78 | 31.69 | 267.7 |
+| `iceberg_compacted` | `polars` | `Q2_range_agg` | 28.74 | 28.74 | 28.13 | 28.74 | 265.1 |
+| `iceberg_compacted` | `polars` | `Q3_topn` | 33.15 | 33.15 | 30.66 | 33.15 | 266.4 |
+
+For full benchmark artifact details and output reports, refer to [docs/benchmarks/real-benchmark-report.md](docs/benchmarks/real-benchmark-report.md).
 
 ---
 

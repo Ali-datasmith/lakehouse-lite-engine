@@ -5,6 +5,20 @@ build-backend = "hatchling.build"
 [project]
 name = "lakehouse-lite-engine"
 version = "0.1.0"
+description = "Embedded zero-JVM transactional lakehouse engine in pure Python 3.13"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+authors = [
+  { name = "Ali Datasmith", email = "rajputmuhammadali979@gmail.com" }
+]
+keywords = ["lakehouse", "iceberg", "duckdb", "polars", "pyarrow", "zero-jvm"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Database :: Database Engines/Servers",
+]
 requires-python = ">=3.13,<3.14"
 dependencies = [
   "pydantic>=2.10",
@@ -15,6 +29,10 @@ dependencies = [
   "duckdb>=1.1",
   "psutil>=6.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Ali-datasmith/lakehouse-lite-engine"
+Repository = "https://github.com/Ali-datasmith/lakehouse-lite-engine"
 
 [dependency-groups]
 dev = [
@@ -54,8 +72,11 @@ warn_unreachable = true
 disallow_any_explicit = false
 plugins = ["pydantic.mypy"]
 
+[tool.coverage.run]
+omit = ["src/lakehouse_engine/benchmarks/*"]
+
 [tool.pytest.ini_options]
-addopts = "-ra --strict-markers --cov=lakehouse_engine --cov-branch"
+addopts = "-ra --strict-markers --cov=lakehouse_engine --cov-branch --cov-fail-under=85"
 filterwarnings = ["error"]
 markers = [
   "memory: RSS-gated tests",

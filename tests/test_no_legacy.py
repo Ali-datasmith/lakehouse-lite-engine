@@ -17,9 +17,30 @@ def test_no_legacy_constructs():
         tree = ast.parse(content, filename=str(path))
 
         for node in ast.walk(tree):
-            # Check print calls
+            # Check print, eval, exec calls
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
                 assert node.func.id != "print", f"print() call is banned in {path}"
+                assert node.func.id != "eval", f"eval() call is banned in {path}"
+                assert node.func.id != "exec", f"exec() call is banned in {path}"
+
+            # Check os.system and pickle.loads
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and isinstance(node.func.value, ast.Name)
+            ):
+                if node.func.value.id == "os" and node.func.attr == "system":
+                    raise AssertionError(f"os.system call is banned in {path}")
+                if node.func.value.id == "pickle" and node.func.attr == "loads":
+                    raise AssertionError(f"pickle.loads call is banned in {path}")
+                if node.func.value.id == "subprocess" and node.func.attr == "run":
+                    for kw in node.keywords:
+                        if (
+                            kw.arg == "shell"
+                            and isinstance(kw.value, ast.Constant)
+                            and kw.value.value is True
+                        ):
+                            raise AssertionError(f"subprocess.run(shell=True) is banned in {path}")
 
             # Check banned imports
             if isinstance(node, ast.Import):

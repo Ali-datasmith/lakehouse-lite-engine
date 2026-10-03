@@ -1,6 +1,7 @@
 # src/lakehouse_engine/query/duckdb_adapter.py
+import contextlib
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from types import TracebackType
 from typing import TYPE_CHECKING, Any
 
@@ -29,12 +30,15 @@ class DuckDBSession:
         self._consumed_streams: set[str] = set()
 
         mem_mb = f"{settings.duckdb_memory_limit_bytes // (1024 * 1024)}MB"
-        temp_dir = str(settings.duckdb_temp_dir.resolve())
+        temp_path = settings.duckdb_temp_dir.resolve()
+        temp_path.mkdir(parents=True, exist_ok=True)
+        with contextlib.suppress(Exception):
+            temp_path.chmod(0o700)
 
         config: dict[str, str | bool | int | float | list[str]] = {
             "memory_limit": mem_mb,
             "threads": str(settings.duckdb_threads),
-            "temp_directory": temp_dir,
+            "temp_directory": str(temp_path),
             "preserve_insertion_order": False,
         }
 
@@ -90,15 +94,11 @@ class DuckDBSession:
             )
 
     def sql(
-        self, query: str, *, params: Mapping[str, object] | None = None
+        self, query: str, *, params: Mapping[str, object] | Sequence[object] | None = None
     ) -> duckdb.DuckDBPyRelation:
         self._validate_query(query)
-        if params:
-            param_list = list(params.values())
-            # Use con.execute + fetch_arrow_table or relation via query or temp view
-            res: Any = self._con.execute(query, param_list)
-            # Create a relation from the executed result set
-            return self._con.from_arrow(res.fetch_arrow_table())
+        if params is not None:
+            return self._con.sql(query, params=params)
         return self._con.sql(query)
 
     def sql_stream(

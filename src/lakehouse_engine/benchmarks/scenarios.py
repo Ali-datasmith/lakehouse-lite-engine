@@ -5,7 +5,9 @@ from lakehouse_engine.query.duckdb_adapter import DuckDBSession
 
 
 def run_q1_point_duckdb(session: DuckDBSession, target_id: int = 42) -> int:
-    rel = session.sql("SELECT * FROM events WHERE event_id = $1", params={"target_id": target_id})
+    rel = session.sql(
+        "SELECT * FROM events WHERE event_id = $target_id", params={"target_id": target_id}
+    )
     reader = rel.to_arrow_reader()
     total = sum(b.num_rows for b in reader)
     return total
