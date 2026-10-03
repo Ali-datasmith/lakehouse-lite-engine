@@ -1,7 +1,7 @@
 # src/lakehouse_engine/query/service.py
 import contextlib
 from collections.abc import Sequence
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import polars as pl
 import pyarrow as pa
@@ -36,7 +36,7 @@ class QueryService:
         snapshot_id: int | None = None,
         columns: Sequence[str] | None = None,
     ) -> pl.LazyFrame:
-        """Snapshot-pinned LazyFrame."""
+        """Returns snapshot-pinned LazyFrame."""
         with self._governor.lease(Mode.QUERY):
             snap_id = snapshot_id if snapshot_id is not None else self._catalog.snapshot_id()
             tbl = self._catalog.current_table()
@@ -53,6 +53,26 @@ class QueryService:
                 lf = lf.select(list(columns))
             return lf
 
+    def collect_polars(
+        self,
+        *,
+        snapshot_id: int | None = None,
+        columns: Sequence[str] | None = None,
+    ) -> pl.DataFrame:
+        """Executes Polars collection under query lease governance."""
+        with self._governor.lease(Mode.QUERY):
+            snap_id = snapshot_id if snapshot_id is not None else self._catalog.snapshot_id()
+            tbl = self._catalog.current_table()
+            try:
+                lf = self.polars_lazy(snapshot_id=snap_id, columns=columns)
+                df = lf.collect()
+            except Exception:  # noqa: BLE001
+                lf = self._polars_adapter.scan_iceberg_files(tbl, snapshot_id=snap_id)
+                if columns:
+                    lf = lf.select(list(columns))
+                df = lf.collect()
+            return df
+
     def polars_from_stream(
         self, source: ArrowStreamExportable, *, schema: pa.Schema
     ) -> pl.LazyFrame:
@@ -64,13 +84,27 @@ class QueryService:
         """Creates a DuckDBSession."""
         with self._governor.lease(Mode.QUERY):
             session = DuckDBSession(self._settings)
-            # Register current table as 'events' stream/relation if table has data
             snap_id = snapshot_id if snapshot_id is not None else self._catalog.snapshot_id()
             if snap_id is not None:
                 with contextlib.suppress(Exception):
                     reader = self.to_arrow_reader(snapshot_id=snap_id)
                     session.register_stream("events", reader)
             return session
+
+    def query_duckdb(
+        self,
+        query: str,
+        *,
+        snapshot_id: int | None = None,
+        params: dict[str, Any] | None = None,
+    ) -> pa.Table:
+        """Executes a governed DuckDB query and returns a PyArrow Table."""
+        with (
+            self._governor.lease(Mode.QUERY),
+            self.duckdb_session(snapshot_id=snapshot_id) as session,
+        ):
+            rel = session.sql(query, params=params)
+            return rel.fetch_arrow_table()
 
     def to_arrow_reader(
         self,

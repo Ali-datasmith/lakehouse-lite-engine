@@ -1,26 +1,58 @@
 # src/lakehouse_engine/engine.py
-import contextlib
+import logging
 from types import TracebackType
-from typing import Self
+from typing import TYPE_CHECKING, Any, Self
 
-from lakehouse_engine.buffer.buffer import BufferPolicy, CompactionBuffer
-from lakehouse_engine.buffer.compaction import Compactor
-from lakehouse_engine.buffer.writer import ParquetFlushWriter
-from lakehouse_engine.catalog.manager import CatalogManager
-from lakehouse_engine.catalog.storage import resolve_filesystem
+import pyarrow as pa
+
 from lakehouse_engine.config import EngineSettings
-from lakehouse_engine.governor import ResourceGovernor
-from lakehouse_engine.ingestion.dlq import NdjsonDeadLetterSink
-from lakehouse_engine.ingestion.schema import EVENTS_ARROW_SCHEMA
-from lakehouse_engine.ingestion.validator import MicroBatchValidator, ValidatedBatch
-from lakehouse_engine.query.service import QueryService
 from lakehouse_engine.runtime import configure_runtime
+
+if TYPE_CHECKING:
+    from lakehouse_engine.buffer.compaction import CompactionResult
+    from lakehouse_engine.catalog.manager import CommitResult
+    from lakehouse_engine.ingestion.validator import ValidatedBatch
+    from lakehouse_engine.query.service import QueryService
+
+logger = logging.getLogger(__name__)
+
+
+class MetricsCollector:
+    """No-op default metrics abstraction."""
+
+    def increment(self, metric: str, value: int = 1, tags: dict[str, str] | None = None) -> None:
+        pass
+
+    def gauge(self, metric: str, value: float, tags: dict[str, str] | None = None) -> None:
+        pass
+
+    def histogram(self, metric: str, value: float, tags: dict[str, str] | None = None) -> None:
+        pass
 
 
 class LakehouseEngine:
-    def __init__(self, settings: EngineSettings | None = None) -> None:
+    def __init__(
+        self,
+        settings: EngineSettings | None = None,
+        metrics: MetricsCollector | None = None,
+    ) -> None:
         self._settings = settings if settings is not None else EngineSettings.load()
         configure_runtime(self._settings.runtime)
+
+        self._metrics = metrics or MetricsCollector()
+        logger.info("Initializing LakehouseEngine (env: %s)", self._settings.runtime.env)
+
+        # Defer imports of subsystem classes to prevent eager top-level heavy loads
+        from lakehouse_engine.buffer.buffer import BufferPolicy, CompactionBuffer
+        from lakehouse_engine.buffer.compaction import Compactor
+        from lakehouse_engine.buffer.writer import ParquetFlushWriter
+        from lakehouse_engine.catalog.manager import CatalogManager
+        from lakehouse_engine.catalog.storage import resolve_filesystem
+        from lakehouse_engine.governor import ResourceGovernor
+        from lakehouse_engine.ingestion.dlq import NdjsonDeadLetterSink
+        from lakehouse_engine.ingestion.schema import EVENTS_ARROW_SCHEMA
+        from lakehouse_engine.ingestion.validator import MicroBatchValidator
+        from lakehouse_engine.query.service import QueryService
 
         self._governor = ResourceGovernor(self._settings.runtime)
         self._dlq_sink = NdjsonDeadLetterSink(self._settings.ingestion)
@@ -67,6 +99,7 @@ class LakehouseEngine:
         )
 
         self._closed = False
+        self._metrics.increment("engine_initialized")
 
     def __enter__(self) -> Self:
         return self
@@ -85,38 +118,74 @@ class LakehouseEngine:
         *,
         source: str,
         source_offset: int | None = None,
-    ) -> ValidatedBatch | None:
+    ) -> "ValidatedBatch | None":
         if self._closed:
             raise RuntimeError("LakehouseEngine is closed.")
 
         vbatch = self._validator.validate(raw, source=source, source_offset=source_offset)
         if vbatch.batch is not None and vbatch.batch.num_rows > 0:
             self._buffer.append(vbatch.batch)
+            self._metrics.increment("ingest_accepted_rows", vbatch.accepted)
+        if vbatch.rejected > 0:
+            self._metrics.increment("ingest_rejected_rows", vbatch.rejected)
         return vbatch
 
-    def flush(self) -> object:
+    def append_arrow_batch(self, batch: pa.RecordBatch) -> "CommitResult | None":
+        """Appends a pre-validated PyArrow RecordBatch directly into the compaction buffer."""
         if self._closed:
             raise RuntimeError("LakehouseEngine is closed.")
-        return self._buffer.flush()
+        res = self._buffer.append(batch)
+        if batch is not None and hasattr(batch, "num_rows"):
+            self._metrics.increment("ingest_accepted_rows", batch.num_rows)
+        return res
 
-    def compact(self) -> object:
+    def flush(self) -> "CommitResult | None":
         if self._closed:
             raise RuntimeError("LakehouseEngine is closed.")
+        logger.info("Explicit flush requested")
+        res = self._buffer.flush()
+        if res is not None:
+            self._metrics.increment("flush_success")
+        return res
+
+    def compact(self) -> "CompactionResult | None":
+        if self._closed:
+            raise RuntimeError("LakehouseEngine is closed.")
+        logger.info("Compaction run requested")
         plan = self._compactor.plan()
         if plan is None:
+            logger.info("No compaction plan generated")
             return None
-        return self._compactor.run(plan)
+        res = self._compactor.run(plan)
+        if res is not None:
+            self._metrics.increment("compaction_success")
+        return res
 
     @property
-    def query(self) -> QueryService:
+    def query(self) -> "QueryService":
         return self._query_service
+
+    def status(self) -> dict[str, Any]:
+        """Introspection helper returning health and resource status."""
+        return {
+            "closed": self._closed,
+            "rss_bytes": self._governor.rss_bytes(),
+            "buffer_bytes": self._buffer.total_bytes,
+            "buffer_rows": self._buffer.total_rows,
+            "active_leases": [str(m) for m in self._governor.active_leases],
+        }
 
     def close(self) -> None:
         if not self._closed:
-            with contextlib.suppress(Exception):
-                self._buffer.close()
-            with contextlib.suppress(Exception):
-                self._dlq_sink.close()
-            with contextlib.suppress(Exception):
-                self._catalog.close()
+            logger.info("Closing LakehouseEngine")
+            for sub, name in (
+                (self._buffer, "buffer"),
+                (self._dlq_sink, "dlq_sink"),
+                (self._catalog, "catalog"),
+            ):
+                try:
+                    sub.close()
+                except Exception as exc:
+                    logger.error("Error closing %s: %s", name, exc, exc_info=True)
             self._closed = True
+            self._metrics.increment("engine_closed")

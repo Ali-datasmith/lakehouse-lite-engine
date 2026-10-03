@@ -67,7 +67,7 @@ def _subprocess_worker(
                 for batch in generate_streaming_batches(
                     settings.rows, batch_rows=20000, seed=settings.seed
                 ):
-                    lhe._buffer.append(batch)
+                    lhe.append_arrow_batch(batch)
                 lhe.flush()
 
         with RssSampler() as sampler:
@@ -189,9 +189,7 @@ def _execute_iceberg(engine: str, query: str, tmp_path: Path) -> None:
                 run_q3_topn_polars(lf_iceberg)
 
 
-def _execute_scenario(
-    layout: str, engine: str, query: str, tmp_path: Path, data_dir: Path
-) -> None:
+def _execute_scenario(layout: str, engine: str, query: str, tmp_path: Path, data_dir: Path) -> None:
     if layout == "csv":
         _execute_csv(engine, query, data_dir)
     elif layout == "raw_parquet":
@@ -226,8 +224,12 @@ class BenchmarkHarness:
         res = queue.get()
         mem: MemoryReport = res["memory"]
 
-        if mem.peak_rss_bytes > 500 * 1024 * 1024:
-            raise RuntimeError(f"Memory budget exceeded: Peak RSS {mem.peak_rss_bytes} > 500MB")
+        engine_settings = EngineSettings.load()
+        ceiling_bytes = engine_settings.runtime.process_ceiling_bytes
+        if mem.peak_rss_bytes > ceiling_bytes:
+            raise RuntimeError(
+                f"Memory budget exceeded: Peak RSS {mem.peak_rss_bytes} > {ceiling_bytes} bytes"
+            )
 
         timing = QueryTiming(
             p50_ms=res["p50_ms"],

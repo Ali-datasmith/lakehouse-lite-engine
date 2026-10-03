@@ -1,4 +1,5 @@
 # src/lakehouse_engine/buffer/buffer.py
+import logging
 import threading
 import time
 import uuid
@@ -19,6 +20,8 @@ if TYPE_CHECKING:
     from lakehouse_engine.buffer.writer import ParquetFlushWriter
     from lakehouse_engine.catalog.manager import CommitResult
     from lakehouse_engine.governor import ResourceGovernor
+
+logger = logging.getLogger(__name__)
 
 
 class FlushReason(StrEnum):
@@ -53,6 +56,12 @@ class FileCommitter(Protocol):
 
 
 class CompactionBuffer:
+    """In-memory compaction buffer for incoming Arrow record batches.
+
+    Preserves original flush_id across commit retries to guarantee idempotent fast-append
+    operations.
+    """
+
     def __init__(
         self,
         *,
@@ -76,17 +85,26 @@ class CompactionBuffer:
         self._total_bytes = 0
         self._oldest_batch_time: float | None = None
         self._pending_files: list[FlushedFile] = []
+        self._active_flush_id: str | None = None
         self._closed = False
 
     @property
-    def rows(self) -> int:
+    def total_rows(self) -> int:
         with self._lock:
             return self._total_rows
 
     @property
-    def bytes(self) -> int:
+    def rows(self) -> int:
+        return self.total_rows
+
+    @property
+    def total_bytes(self) -> int:
         with self._lock:
             return self._total_bytes
+
+    @property
+    def bytes(self) -> int:
+        return self.total_bytes
 
     @property
     def pending_files(self) -> tuple[FlushedFile, ...]:
@@ -145,14 +163,48 @@ class CompactionBuffer:
 
             return commit_result
 
+    def recover_pending(self) -> "CommitResult | None":
+        """Explicit recovery API for attempting commit replay on uncommitted pending files."""
+        with self._lock:
+            if not self._pending_files:
+                return None
+            return self.flush(reason=FlushReason.EXPLICIT)
+
     def flush(self, reason: FlushReason = FlushReason.EXPLICIT) -> "CommitResult | None":
         with self._lock:
             if not self._batches and not self._pending_files:
                 return None
 
             with self._governor.lease(Mode.FLUSH):
-                flush_id = uuid.uuid4().hex
+                pending_result: CommitResult | None = None
+
+                # Step 1: Commit existing pending files first using their original flush_id
+                if self._pending_files:
+                    if self._active_flush_id is None:
+                        self._active_flush_id = self._pending_files[0].flush_id
+
+                    pending_flush_id = self._active_flush_id
+                    try:
+                        pending_result = self._committer.commit_files(
+                            self._pending_files, flush_id=pending_flush_id
+                        )
+                        self._pending_files.clear()
+                        self._active_flush_id = None
+                    except Exception as exc:
+                        logger.warning(
+                            "Commit failed for pending flush_id %s: %s", pending_flush_id, exc
+                        )
+                        raise
+
+                    if not self._batches:
+                        return pending_result
+
+                # Step 2: Flush and commit newly accumulated in-memory batches under a new flush_id
                 if self._batches:
+                    if self._active_flush_id is None:
+                        self._active_flush_id = uuid.uuid4().hex
+
+                    flush_id = self._active_flush_id
                     rel_path = f"{self._data_dir}/{flush_id}.parquet"
                     batches_to_write = list(self._batches)
                     arrow_bytes = self._total_bytes
@@ -179,10 +231,19 @@ class CompactionBuffer:
                     del batches_to_write
                     self._governor.release_memory()
 
-                # Commit phase
-                result = self._committer.commit_files(self._pending_files, flush_id=flush_id)
-                self._pending_files.clear()
-                return result
+                    try:
+                        result = self._committer.commit_files(
+                            self._pending_files, flush_id=flush_id
+                        )
+                    except Exception as exc:
+                        logger.warning("Commit failed for flush_id %s: %s", flush_id, exc)
+                        raise
+                    else:
+                        self._pending_files.clear()
+                        self._active_flush_id = None
+                        return result
+
+                return pending_result
 
     def close(self) -> "CommitResult | None":
         with self._lock:

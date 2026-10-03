@@ -1,37 +1,56 @@
 # src/lakehouse_engine/catalog/schema_guard.py
 import pyarrow as pa
+from pyiceberg.io.pyarrow import schema_to_pyarrow
 from pyiceberg.schema import Schema as IcebergSchema
 
 from lakehouse_engine.exceptions import SchemaEvolutionError
 
 
+def _normalize_arrow_type(t: pa.DataType) -> pa.DataType:
+    """Normalizes large_string to string for PyIceberg compatibility."""
+    if t == pa.large_string():
+        return pa.string()
+    return t
+
+
 def assert_compatible(table_schema: IcebergSchema, expected_arrow_schema: pa.Schema) -> None:
     """Strictly checks table schema compatibility with expected_arrow_schema.
 
-    Compares field names, types, order, and nullability.
+    Compares field names, types, order, and nullability by converting Iceberg schema to Arrow.
     Raises SchemaEvolutionError on any mismatch.
     """
-    iceberg_fields = table_schema.fields
-    arrow_fields = list(expected_arrow_schema)
-
+    table_arrow_schema = schema_to_pyarrow(table_schema)
     diffs: list[str] = []
 
-    if len(iceberg_fields) != len(arrow_fields):
-        diffs.append(
-            f"Field count mismatch: table has {len(iceberg_fields)}, expected {len(arrow_fields)}"
+    if len(table_arrow_schema) != len(expected_arrow_schema):
+        msg = (
+            f"Field count mismatch: table has {len(table_arrow_schema)}, "
+            f"expected {len(expected_arrow_schema)}"
         )
+        diffs.append(msg)
 
-    for idx, (i_field, a_field) in enumerate(zip(iceberg_fields, arrow_fields, strict=False)):
-        if i_field.name != a_field.name:
+    for idx, (t_field, e_field) in enumerate(
+        zip(table_arrow_schema, expected_arrow_schema, strict=False)
+    ):
+        if t_field.name != e_field.name:
             msg = (
-                f"Field position {idx} name mismatch: table has '{i_field.name}', "
-                f"expected '{a_field.name}'"
+                f"Field position {idx} name mismatch: table has '{t_field.name}', "
+                f"expected '{e_field.name}'"
             )
             diffs.append(msg)
-        if i_field.required == a_field.nullable:
+
+        t_type = _normalize_arrow_type(t_field.type)
+        e_type = _normalize_arrow_type(e_field.type)
+        if t_type != e_type:
             msg = (
-                f"Field '{a_field.name}' nullability mismatch: table required={i_field.required}, "
-                f"expected nullable={a_field.nullable}"
+                f"Field '{e_field.name}' type mismatch: table type '{t_type}', expected '{e_type}'"
+            )
+            diffs.append(msg)
+
+        if t_field.nullable != e_field.nullable:
+            msg = (
+                f"Field '{e_field.name}' nullability mismatch: "
+                f"table nullable={t_field.nullable}, expected={e_field.nullable}"
             )
             diffs.append(msg)
 

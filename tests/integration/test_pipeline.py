@@ -47,9 +47,8 @@ def test_full_pipeline_ingest_query_compact(tmp_path):
         assert commit is not None
         assert commit.added_rows == 100
 
-        # Query Polars
-        lf = engine.query.polars_lazy()
-        df = lf.collect(engine="streaming")
+        # Query Polars (governed)
+        df = engine.query.collect_polars()
         assert len(df) == 100
 
         # Query DuckDB

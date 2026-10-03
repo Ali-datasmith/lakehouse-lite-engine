@@ -16,6 +16,7 @@ class _Section(BaseModel):
 
 
 class RuntimeSettings(_Section):
+    env: Literal["dev", "prod"] = "dev"
     memory_hard_limit_bytes: Annotated[int, Field(ge=64 * MiB, le=4096 * MiB)] = 480 * MiB
     memory_soft_limit_bytes: Annotated[int, Field(ge=32 * MiB)] = 440 * MiB
     process_ceiling_bytes: Annotated[int, Field(ge=64 * MiB)] = 500 * MiB  # CI/benchmark gate
@@ -23,15 +24,18 @@ class RuntimeSettings(_Section):
     cpu_threads: Annotated[int, Field(ge=1, le=64)] = 2
     io_threads: Annotated[int, Field(ge=1, le=64)] = 4
     allow_concurrent_query_during_flush: bool = False
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
 
 
 class IngestionSettings(_Section):
     max_batch_rows: Annotated[int, Field(ge=1, le=100_000)] = 20_000
     max_batch_bytes: Annotated[int, Field(ge=1024, le=64 * MiB)] = 8 * MiB
     max_line_bytes: Annotated[int, Field(ge=256, le=8 * MiB)] = 1 * MiB
-    dlq_dir: Path = Path("/tmp/lhe/dlq")  # noqa: S108
+    dlq_dir: Path = Path(".lakehouse-lite/dlq")
     dlq_rotate_bytes: Annotated[int, Field(ge=1 * MiB)] = 16 * MiB
     dlq_raw_truncate_bytes: Annotated[int, Field(ge=256, le=1 * MiB)] = 64 * 1024
+    dlq_retention_days: Annotated[int, Field(ge=1, le=365)] = 30
+    dlq_max_total_bytes: Annotated[int, Field(ge=10 * MiB)] = 1024 * MiB
     max_reject_ratio: Annotated[float, Field(ge=0.0, le=1.0)] = 0.5
     reject_ratio_min_sample: Annotated[int, Field(ge=1)] = 1_000
 
@@ -52,6 +56,7 @@ class CompactionSettings(_Section):
     small_file_threshold_bytes: Annotated[int, Field(ge=1 * MiB)] = 64 * MiB
     target_file_bytes: Annotated[int, Field(ge=8 * MiB, le=512 * MiB)] = 128 * MiB
     read_batch_rows: Annotated[int, Field(ge=10_000, le=500_000)] = 100_000
+    use_threads: bool = False
 
 
 class StorageSettings(_Section):
@@ -64,8 +69,8 @@ class StorageSettings(_Section):
 class CatalogSettings(_Section):
     name: str = "local"
     kind: Literal["sql", "rest"] = "sql"
-    uri: str = "sqlite:///catalog.db"
-    warehouse_uri: str = "file:///tmp/warehouse"
+    uri: str = "sqlite:///.lakehouse-lite/catalog.db"
+    warehouse_uri: str = "file:///.lakehouse-lite/warehouse"
     rest_token: SecretStr | None = None
     namespace: Annotated[str, Field(pattern=r"^[A-Za-z_][A-Za-z0-9_]*$")] = "default"
     table_name: Annotated[str, Field(pattern=r"^[A-Za-z_][A-Za-z0-9_]*$")] = "events"
@@ -77,7 +82,8 @@ class CatalogSettings(_Section):
 class QuerySettings(_Section):
     duckdb_memory_limit_bytes: Annotated[int, Field(ge=32 * MiB)] = 192 * MiB
     duckdb_threads: Annotated[int, Field(ge=1, le=16)] = 2
-    duckdb_temp_dir: Path = Path("/tmp/lhe/duckdb-spill")  # noqa: S108
+    duckdb_temp_dir: Path = Path(".lakehouse-lite/duckdb-spill")
+    duckdb_timeout_seconds: Annotated[float, Field(gt=0.0)] = 30.0
     polars_threads: Annotated[int, Field(ge=1, le=16)] = 2
     polars_strategy: Literal["iceberg", "parquet_files"] = "iceberg"
     arrow_batch_rows: Annotated[int, Field(ge=10_000, le=500_000)] = 100_000
@@ -90,9 +96,6 @@ class BenchmarkSettings(_Section):
     runs: Annotated[int, Field(ge=1)] = 5
     seed: int = 20260930
     output_dir: Path = Path("./bench-out")
-    s3_get_per_1k_usd: float = 0.0
-    s3_put_list_per_1k_usd: float = 0.0
-    s3_head_per_1k_usd: float = 0.0
 
 
 class EngineSettings(BaseSettings):
@@ -142,6 +145,18 @@ class EngineSettings(BaseSettings):
             raise ConfigurationError(
                 "commit_backoff_base_seconds must be <= commit_backoff_max_seconds"
             )
+
+        # Insecure /tmp validation in prod
+        if r.env == "prod":
+            for path_name, path_val in (
+                ("dlq_dir", self.ingestion.dlq_dir),
+                ("duckdb_temp_dir", self.query.duckdb_temp_dir),
+            ):
+                resolved = path_val.resolve()
+                if resolved == Path("/tmp") or resolved.parent == Path("/tmp"):  # noqa: S108
+                    raise ConfigurationError(
+                        f"Insecure default path '{path_name}' in production environment: {path_val}"
+                    )
         return self
 
     @classmethod
