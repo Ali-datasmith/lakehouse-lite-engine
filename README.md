@@ -1,3 +1,5 @@
+<img width="1024" height="318" alt="image" src="https://github.com/user-attachments/assets/81678c6c-bdcf-4d85-a8ba-2b9c4a7a00a9" />
+
 # lakehouse-lite-engine
 
 [![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/downloads/release/python-3130/)
