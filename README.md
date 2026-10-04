@@ -27,10 +27,10 @@ By replacing JVM-bound infrastructure (PySpark, Py4J, Java runtimes) with native
  JSON / NDJSON Micro-Batches (<= 8 MB)
                  │
                  ▼
- ┌──────────────────────────────────┐   rejected   ┌─────────────────────────────┐
+ ┌──────────────────────────────────┐   rejected    ┌─────────────────────────────┐
  │ ingestion.MicroBatchValidator    │─────────────▶│ Ingestion DLQ (NDJSON)      │
- │ Pydantic v2 validate_json        │              │ NdjsonDeadLetterSink        │
- └─────────────────┬────────────────┘              └─────────────────────────────┘
+ │ Pydantic v2 validate_json        │               │ NdjsonDeadLetterSink        │
+ └─────────────────┬────────────────┘               └─────────────────────────────┘
                    │ pa.RecordBatch (<= 16 MB, schema-locked)
                    ▼
  ┌──────────────────────────────────┐
