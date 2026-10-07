@@ -1,5 +1,3 @@
-# src/lakehouse_engine/catalog/manager.py
-import contextlib
 import logging
 import random
 import time
@@ -7,7 +5,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from fcntl import LOCK_EX, LOCK_NB, flock
 from pathlib import Path
-from typing import TYPE_CHECKING, NoReturn, TextIO
+from typing import TYPE_CHECKING, TextIO
 
 from pyiceberg.catalog import Catalog, load_catalog
 from pyiceberg.exceptions import CommitFailedException
@@ -43,24 +41,21 @@ class CatalogManager:
         self._table: Table | None = None
         self._lock_file: TextIO | None = None
 
-    def open(self) -> None:
-        """Loads the catalog, ensures namespace + table, runs the schema guard.
+    @property
+    def storage_settings(self) -> "StorageSettings":
+        return self._storage
 
-        Raises CatalogConnectionError, SchemaEvolutionError, ConfigurationError.
-        """
-        # SQLite single-writer lock check
+    def open(self) -> None:
         if self._settings.uri.startswith("sqlite:"):
             db_path_str = self._settings.uri.replace("sqlite:///", "").replace("sqlite://", "")
             lock_path = Path(db_path_str + ".lock").resolve()
-            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            lock_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
             try:
                 lf = lock_path.open("w")
                 flock(lf, LOCK_EX | LOCK_NB)
                 self._lock_file = lf
             except OSError as exc:
-                raise CatalogConnectionError(
-                    f"Failed to acquire writer lock for SQLite catalog at {lock_path}: {exc}"
-                ) from exc
+                raise CatalogConnectionError(f"Failed to acquire writer lock: {exc}") from exc
 
         props: dict[str, str] = {
             "type": self._settings.kind,
@@ -68,7 +63,6 @@ class CatalogManager:
             "warehouse": self._settings.warehouse_uri,
             "py-io-impl": "pyiceberg.io.pyarrow.PyArrowFileIO",
         }
-
         if self._storage.s3_endpoint:
             props["s3.endpoint"] = self._storage.s3_endpoint
         if self._storage.s3_region:
@@ -77,7 +71,6 @@ class CatalogManager:
             props["s3.access-key-id"] = self._storage.s3_access_key_id.get_secret_value()
         if self._storage.s3_secret_access_key:
             props["s3.secret-access-key"] = self._storage.s3_secret_access_key.get_secret_value()
-
         if self._settings.rest_token:
             props["token"] = self._settings.rest_token.get_secret_value()
 
@@ -99,12 +92,8 @@ class CatalogManager:
                 },
             )
         except Exception as exc:
-            if isinstance(exc, (CatalogConnectionError, CatalogCommitError)):
-                raise
-            raise CatalogConnectionError(f"Failed to initialize catalog or table: {exc}") from exc
-
+            raise CatalogConnectionError(f"Failed to initialize catalog: {exc}") from exc
         assert_compatible(self._table.schema(), EVENTS_ARROW_SCHEMA)
-        logger.info("Catalog opened successfully for table %s", self._settings.table_name)
 
     @property
     def table(self) -> Table:
@@ -117,176 +106,102 @@ class CatalogManager:
         return self._table
 
     def snapshot_id(self) -> int | None:
-        tbl = self.current_table()
-        current = tbl.current_snapshot()
+        current = self.current_table().current_snapshot()
         return current.snapshot_id if current is not None else None
 
     def data_dir(self) -> str:
-        tbl = self.current_table()
-        return f"{tbl.location()}/data"
+        return f"{self.current_table().location()}/data"
 
     def _check_idempotency(self, flush_id: str) -> CommitResult | None:
-        tbl = self.current_table()
-        for snap in tbl.metadata.snapshots:
+        for snap in self.current_table().metadata.snapshots:
             if snap.summary and snap.summary.additional_properties.get("lhe.flush-id") == flush_id:
-                logger.info("Replayed idempotent flush_id %s", flush_id)
-                return CommitResult(
-                    snapshot_id=snap.snapshot_id,
-                    flush_id=flush_id,
-                    attempts=1,
-                    added_files=0,
-                    added_rows=0,
-                    replayed=True,
-                )
+                return CommitResult(snap.snapshot_id, flush_id, 1, 0, 0, True)
         return None
 
     def commit_files(self, files: Sequence["FlushedFile"], *, flush_id: str) -> CommitResult:
         if not files:
-            raise CatalogCommitError("No files provided to commit.")
-
+            raise CatalogCommitError("No files provided.")
         replayed_res = self._check_idempotency(flush_id)
-        if replayed_res is not None:
+        if replayed_res:
             return replayed_res
-
         identifier = f"{self._settings.namespace}.{self._settings.table_name}"
         file_paths = [f.path for f in files]
         added_rows = sum(f.rows for f in files)
-
         attempts = 0
         backoff_base = self._settings.commit_backoff_base_seconds
         backoff_max = self._settings.commit_backoff_max_seconds
-
         for attempt in range(1, self._settings.commit_max_attempts + 1):
             attempts = attempt
             replayed = self._check_idempotency(flush_id)
-            if replayed is not None:
+            if replayed:
                 return replayed
-
             try:
                 if self._catalog is None:
-                    raise CatalogConnectionError("Catalog is not open.")  # noqa: TRY301
+                    raise CatalogConnectionError("Catalog not open.")
                 fresh_table = self._catalog.load_table(identifier)
                 fresh_table.add_files(
-                    file_paths=file_paths,
-                    snapshot_properties={"lhe.flush-id": flush_id},
+                    file_paths=file_paths, snapshot_properties={"lhe.flush-id": flush_id}
                 )
                 self._table = fresh_table
-                current_snap = fresh_table.current_snapshot()
-                snap_id = current_snap.snapshot_id if current_snap else -1
-                logger.info(
-                    "Committed %d files (flush_id: %s) on attempt %d",
-                    len(files),
-                    flush_id,
-                    attempt,
+                snap_id = (
+                    fresh_table.current_snapshot().snapshot_id
+                    if fresh_table.current_snapshot()
+                    else -1
                 )
-                return CommitResult(
-                    snapshot_id=snap_id,
-                    flush_id=flush_id,
-                    attempts=attempts,
-                    added_files=len(files),
-                    added_rows=added_rows,
-                    replayed=False,
-                )
+                return CommitResult(snap_id, flush_id, attempts, len(files), added_rows, False)
             except CommitFailedException:
-                logger.warning(
-                    "Commit failed due to concurrent modification on attempt %d", attempt
-                )
                 if attempt == self._settings.commit_max_attempts:
                     break
-                jitter = random.uniform(0.5, 1.5)  # noqa: S311
-                sleep_time = min(backoff_max, backoff_base * (2 ** (attempt - 1))) * jitter
-                time.sleep(sleep_time)
+                jitter = random.uniform(0.5, 1.5)
+                time.sleep(min(backoff_max, backoff_base * (2 ** (attempt - 1))) * jitter)
             except Exception as exc:
                 raise CatalogCommitError(
-                    f"Commit failed on attempt {attempt}: {exc}",
-                    context={"pending_files": file_paths, "flush_id": flush_id},
+                    f"Commit failed: {exc}", context={"pending_files": file_paths}
                 ) from exc
-
         raise CatalogCommitError(
-            f"Commit exhausted {self._settings.commit_max_attempts} attempts.",
-            context={"pending_files": file_paths, "flush_id": flush_id},
-        )
-
-    def _raise_missing_delete_paths(self, missing: set[str]) -> NoReturn:
-        msg = f"Compaction replace failed: delete paths not found in metadata: {missing}"
-        raise CatalogCommitError(
-            msg,
-            context={"missing_delete_paths": list(missing)},
+            "Commit exhausted attempts.", context={"pending_files": file_paths}
         )
 
     def commit_replace(
-        self,
-        *,
-        delete: Sequence[str],
-        add_paths: Sequence[str],
-        flush_id: str,
+        self, *, delete: Sequence[str], add_paths: Sequence[str], flush_id: str
     ) -> CommitResult:
         replayed_res = self._check_idempotency(flush_id)
-        if replayed_res is not None:
+        if replayed_res:
             return replayed_res
-
-        identifier = f"{self._settings.namespace}.{self._settings.table_name}"
         tbl = self.current_table()
-        try:
-            delete_set = set(delete)
-            matching_data_files = [
-                task.file for task in tbl.scan().plan_files() if task.file.file_path in delete_set
-            ]
-
-            if len(matching_data_files) != len(delete_set):
-                missing = delete_set - {df.file_path for df in matching_data_files}
-                self._raise_missing_delete_paths(missing)
-
-            tx = tbl.transaction()
-            update_snap = tx.update_snapshot(
+        delete_set = set(delete)
+        matching_data_files = [
+            task.file for task in tbl.scan().plan_files() if task.file.file_path in delete_set
+        ]
+        if len(matching_data_files) != len(delete_set):
+            missing = delete_set - {df.file_path for df in matching_data_files}
+            raise CatalogCommitError(f"Delete paths not found: {missing}")
+        with tbl.transaction() as tx:
+            overwrite = tx.update_snapshot(
                 snapshot_properties={"lhe.flush-id": flush_id}
             ).overwrite()
-
             for df in matching_data_files:
-                update_snap.delete_data_file(df)
-
+                overwrite.delete_file(df)
             added_rows = 0
             for path in add_paths:
                 data_file = parquet_file_to_data_file(tbl.io, tbl.metadata, path)
                 added_rows += data_file.record_count
-                update_snap.append_data_file(data_file)
-
-            tx.commit_transaction()
-            if self._catalog is not None:
-                fresh_table = self._catalog.load_table(identifier)
-                self._table = fresh_table
-            else:
-                self._table = tbl
-            current_snap = self._table.current_snapshot()
-            snap_id = current_snap.snapshot_id if current_snap else -1
-            return CommitResult(
-                snapshot_id=snap_id,
-                flush_id=flush_id,
-                attempts=1,
-                added_files=len(add_paths),
-                added_rows=added_rows,
-                replayed=False,
-            )
-        except Exception as exc:
-            if isinstance(exc, CatalogCommitError):
-                raise
-            raise CatalogCommitError(
-                f"Compaction replace commit failed: {exc}",
-                context={"delete_paths": list(delete), "add_paths": list(add_paths)},
-            ) from exc
+                overwrite.append_file(data_file)
+        fresh_table = (
+            self._catalog.load_table(f"{self._settings.namespace}.{self._settings.table_name}")
+            if self._catalog
+            else tbl
+        )
+        self._table = fresh_table
+        snap_id = (
+            fresh_table.current_snapshot().snapshot_id if fresh_table.current_snapshot() else -1
+        )
+        return CommitResult(snap_id, flush_id, 1, len(add_paths), added_rows, False)
 
     def close(self) -> None:
-        if self._catalog is not None:
-            with contextlib.suppress(Exception):
-                if hasattr(self._catalog, "close"):
-                    self._catalog.close()
-                elif hasattr(self._catalog, "_session"):
-                    sess = getattr(self._catalog, "_session", None)
-                    if sess and hasattr(sess, "close"):
-                        sess.close()
-            self._catalog = None
-
         if self._lock_file is not None:
-            with contextlib.suppress(Exception):
+            try:
                 self._lock_file.close()
+            except Exception:
+                pass
             self._lock_file = None

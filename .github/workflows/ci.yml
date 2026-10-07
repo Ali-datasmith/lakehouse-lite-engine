@@ -11,47 +11,48 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Install uv
         uses: astral-sh/setup-uv@v3
-        with:
-          version: "latest"
-
+        with: { version: "latest" }
       - name: Set up Python 3.13
         uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-
+        with: { python-version: "3.13" }
       - name: Install dependencies
         run: uv sync
-
       - name: Run Ruff check & format check
-        run: uv run ruff check src tests
-
+        run: |
+          uv run ruff check src tests
+          uv run ruff format --check src tests
       - name: Run Mypy strict check
-        run: uv run mypy src/lakehouse_engine
+        run: uv run mypy --strict src tests
 
   unit-and-contract-tests:
     runs-on: ubuntu-latest
     needs: lint-and-typecheck
     steps:
       - uses: actions/checkout@v4
-
       - name: Install uv
         uses: astral-sh/setup-uv@v3
-        with:
-          version: "latest"
-
+        with: { version: "latest" }
       - name: Set up Python 3.13
         uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-
+        with: { python-version: "3.13" }
       - name: Install dependencies
         run: uv sync
-
+      - name: Run legacy and JVM checks
+        run: uv run pytest tests/test_no_legacy.py -m "not memory and not bench"
       - name: Run pytest with coverage
-        run: uv run pytest --cov=lakehouse_engine --cov-report=xml
-
+        run: uv run pytest --cov=lakehouse_engine --cov-branch --cov-report=xml -m "not memory and not bench"
       - name: Run benchmark smoke
         run: uv run python -m lakehouse_engine.benchmarks --rows 100000 --runs 2 --out ./bench-out
+
+  sast:
+    runs-on: ubuntu-latest
+    needs: lint-and-typecheck
+    steps:
+      - uses: actions/checkout@v4
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with: { languages: python, queries: security-extended }
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3

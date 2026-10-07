@@ -12,7 +12,7 @@ from lakehouse_engine.query.polars_adapter import PolarsAdapter
 
 
 @pytest.mark.contract
-def test_ct01_ct02_fast_append_and_idempotency(test_engine):
+def test_ct01_ct02_fast_append_and_idempotency(test_engine) -> None:
     event_raw = (
         b'{"event_id": 101, "user_id": 1, "event_name": "test", '
         b'"event_ts": "2026-09-30T12:00:00Z"}\n'
@@ -38,7 +38,7 @@ def test_ct01_ct02_fast_append_and_idempotency(test_engine):
 
 
 @pytest.mark.contract
-def test_ct03_compaction_replace_commit(test_engine):
+def test_ct03_compaction_replace_commit(test_engine) -> None:
     event_raw = (
         b'{"event_id": 102, "user_id": 2, "event_name": "compact_test", '
         b'"event_ts": "2026-09-30T12:00:00Z"}\n'
@@ -68,7 +68,7 @@ def test_ct03_compaction_replace_commit(test_engine):
 
 
 @pytest.mark.contract
-def test_ct04_ct05_polars_adapter_capability(test_engine):
+def test_ct04_ct05_polars_adapter_capability(test_engine) -> None:
     adapter = PolarsAdapter()
     tbl = test_engine._catalog.current_table()
     lf = adapter.scan_iceberg_files(tbl, snapshot_id=None)
@@ -91,7 +91,7 @@ def test_ct04_ct05_polars_adapter_capability(test_engine):
 
 
 @pytest.mark.contract
-def test_ct06_duckdb_stream_registration(test_engine_settings):
+def test_ct06_duckdb_stream_registration(test_engine_settings) -> None:
     session = DuckDBSession(test_engine_settings.query)
 
     ts1 = datetime(2026, 9, 30, 12, 0, 0, tzinfo=UTC)
@@ -117,7 +117,7 @@ def test_ct06_duckdb_stream_registration(test_engine_settings):
 
 
 @pytest.mark.contract
-def test_ct07_ct08_ct09_zero_copy_and_capsule():
+def test_ct07_ct08_ct09_zero_copy_and_capsule() -> None:
     ts = datetime(2026, 9, 30, 12, 0, 0, tzinfo=UTC)
     arr_int = pa.array([10, 20, 30], type=pa.int64())
     arr_ts = pa.array([ts, ts, ts], type=pa.timestamp("us", tz="UTC"))
@@ -131,7 +131,7 @@ def test_ct07_ct08_ct09_zero_copy_and_capsule():
 
 
 @pytest.mark.contract
-def test_ct10_no_deprecation_warnings():
+def test_ct10_no_deprecation_warnings() -> None:
     import warnings
 
     with warnings.catch_warnings():

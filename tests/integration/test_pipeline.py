@@ -5,7 +5,7 @@ from lakehouse_engine.config import EngineSettings
 from lakehouse_engine.engine import LakehouseEngine
 
 
-def test_full_pipeline_ingest_query_compact(tmp_path):
+def test_full_pipeline_ingest_query_compact(tmp_path) -> None:
     warehouse = tmp_path / "warehouse"
     warehouse.mkdir(parents=True, exist_ok=True)
     db = tmp_path / "catalog.db"

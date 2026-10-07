@@ -5,14 +5,14 @@ from lakehouse_engine.config import EngineSettings
 from lakehouse_engine.exceptions import ConfigurationError
 
 
-def test_config_defaults():
+def test_config_defaults() -> None:
     settings = EngineSettings.load()
     assert settings.runtime.process_ceiling_bytes == 500 * 1024 * 1024
     assert settings.buffer.max_bytes == 128 * 1024 * 1024
     assert settings.ingestion.max_batch_rows == 20000
 
 
-def test_config_invalid_invariant():
+def test_config_invalid_invariant() -> None:
     with pytest.raises(ConfigurationError):
         EngineSettings.load(
             runtime={
@@ -22,6 +22,6 @@ def test_config_invalid_invariant():
         )
 
 
-def test_secret_redaction():
+def test_secret_redaction() -> None:
     settings = EngineSettings.load(storage={"s3_access_key_id": "SUPER_SECRET_KEY"})
     assert "SUPER_SECRET_KEY" not in repr(settings.storage)

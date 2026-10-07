@@ -8,7 +8,7 @@ from lakehouse_engine.ingestion.dlq import NdjsonDeadLetterSink
 from lakehouse_engine.ingestion.validator import MicroBatchValidator
 
 
-def test_validator_fast_path(tmp_path):
+def test_validator_fast_path(tmp_path) -> None:
     sink = NdjsonDeadLetterSink(IngestionSettings(dlq_dir=tmp_path / "dlq"))
     validator = MicroBatchValidator(IngestionSettings(), sink)
 
@@ -28,7 +28,7 @@ def test_validator_fast_path(tmp_path):
     assert vbatch.batch.num_rows == 1
 
 
-def test_validator_isolation_path(tmp_path):
+def test_validator_isolation_path(tmp_path) -> None:
     sink = NdjsonDeadLetterSink(IngestionSettings(dlq_dir=tmp_path / "dlq"))
     validator = MicroBatchValidator(IngestionSettings(), sink)
 
@@ -43,7 +43,7 @@ def test_validator_isolation_path(tmp_path):
     assert vbatch.rejected == 1
 
 
-def test_validator_oversize_batch(tmp_path):
+def test_validator_oversize_batch(tmp_path) -> None:
     sink = NdjsonDeadLetterSink(IngestionSettings(dlq_dir=tmp_path / "dlq"))
     settings = IngestionSettings(max_batch_bytes=2048)
     validator = MicroBatchValidator(settings, sink)

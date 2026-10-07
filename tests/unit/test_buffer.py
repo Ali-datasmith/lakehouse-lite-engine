@@ -26,6 +26,9 @@ class DummyCommitter:
     def __init__(self):
         self.committed = []
 
+    def data_dir(self) -> str:
+        return "test_data"
+
     def commit_files(self, files, *, flush_id):
         self.committed.extend(files)
         return DummyResult(
@@ -38,7 +41,7 @@ class DummyCommitter:
         )
 
 
-def test_buffer_append_and_flush(tmp_path, test_engine_settings):
+def test_buffer_append_and_flush(tmp_path, test_engine_settings) -> None:
     governor = ResourceGovernor(test_engine_settings.runtime)
     writer = ParquetFlushWriter(
         test_engine_settings.buffer,
@@ -80,7 +83,7 @@ def test_buffer_append_and_flush(tmp_path, test_engine_settings):
     assert buffer.rows == 0
 
 
-def test_buffer_schema_mismatch(tmp_path, test_engine_settings):
+def test_buffer_schema_mismatch(tmp_path, test_engine_settings) -> None:
     governor = ResourceGovernor(test_engine_settings.runtime)
     writer = ParquetFlushWriter(
         test_engine_settings.buffer, EVENTS_ARROW_SCHEMA, pa.fs.LocalFileSystem()
@@ -94,7 +97,7 @@ def test_buffer_schema_mismatch(tmp_path, test_engine_settings):
         data_dir=str(tmp_path),
     )
 
-    bad_schema = pa.schema([pa.field("col", pa.int64())])
+    bad_schema = pa.schema([  # type: ignore[arg-type]pa.field("col", pa.int64())])
     bad_batch = pa.RecordBatch.from_arrays([pa.array([1])], schema=bad_schema)
 
     with pytest.raises(SchemaMismatchError):

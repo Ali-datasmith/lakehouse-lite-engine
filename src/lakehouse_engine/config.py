@@ -1,8 +1,7 @@
-# src/lakehouse_engine/config.py
 from pathlib import Path
-from typing import Annotated, Final, Literal, Self
+from typing import Annotated, Any, Final, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, ValidationError, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from lakehouse_engine.exceptions import ConfigurationError
@@ -19,19 +18,18 @@ class RuntimeSettings(_Section):
     env: Literal["dev", "prod"] = "dev"
     memory_hard_limit_bytes: Annotated[int, Field(ge=64 * MiB, le=4096 * MiB)] = 480 * MiB
     memory_soft_limit_bytes: Annotated[int, Field(ge=32 * MiB)] = 440 * MiB
-    process_ceiling_bytes: Annotated[int, Field(ge=64 * MiB)] = 500 * MiB  # CI/benchmark gate
+    process_ceiling_bytes: Annotated[int, Field(ge=64 * MiB)] = 500 * MiB
     arrow_memory_pool: Literal["system", "mimalloc", "jemalloc"] = "mimalloc"
     cpu_threads: Annotated[int, Field(ge=1, le=64)] = 2
     io_threads: Annotated[int, Field(ge=1, le=64)] = 4
     allow_concurrent_query_during_flush: bool = False
-    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
 
 
 class IngestionSettings(_Section):
     max_batch_rows: Annotated[int, Field(ge=1, le=100_000)] = 20_000
     max_batch_bytes: Annotated[int, Field(ge=1024, le=64 * MiB)] = 8 * MiB
     max_line_bytes: Annotated[int, Field(ge=256, le=8 * MiB)] = 1 * MiB
-    dlq_dir: Path = Path(".lakehouse-lite/dlq")
+    dlq_dir: Path = Path("/tmp/lhe/dlq")
     dlq_rotate_bytes: Annotated[int, Field(ge=1 * MiB)] = 16 * MiB
     dlq_raw_truncate_bytes: Annotated[int, Field(ge=256, le=1 * MiB)] = 64 * 1024
     dlq_retention_days: Annotated[int, Field(ge=1, le=365)] = 30
@@ -41,7 +39,7 @@ class IngestionSettings(_Section):
 
 
 class BufferSettings(_Section):
-    max_bytes: Annotated[int, Field(ge=1 * MiB, le=128 * MiB)] = 128 * MiB  # hard-capped at 128 MB
+    max_bytes: Annotated[int, Field(ge=1 * MiB, le=128 * MiB)] = 128 * MiB
     max_rows: Annotated[int, Field(ge=100_000, le=500_000)] = 500_000
     max_age_seconds: Annotated[float, Field(gt=0.0)] = 60.0
     compression: Literal["zstd"] = "zstd"
@@ -56,7 +54,6 @@ class CompactionSettings(_Section):
     small_file_threshold_bytes: Annotated[int, Field(ge=1 * MiB)] = 64 * MiB
     target_file_bytes: Annotated[int, Field(ge=8 * MiB, le=512 * MiB)] = 128 * MiB
     read_batch_rows: Annotated[int, Field(ge=10_000, le=500_000)] = 100_000
-    use_threads: bool = False
 
 
 class StorageSettings(_Section):
@@ -69,8 +66,8 @@ class StorageSettings(_Section):
 class CatalogSettings(_Section):
     name: str = "local"
     kind: Literal["sql", "rest"] = "sql"
-    uri: str = "sqlite:///.lakehouse-lite/catalog.db"
-    warehouse_uri: str = "file:///.lakehouse-lite/warehouse"
+    uri: str = "sqlite:///catalog.db"
+    warehouse_uri: str = "file:///tmp/warehouse"
     rest_token: SecretStr | None = None
     namespace: Annotated[str, Field(pattern=r"^[A-Za-z_][A-Za-z0-9_]*$")] = "default"
     table_name: Annotated[str, Field(pattern=r"^[A-Za-z_][A-Za-z0-9_]*$")] = "events"
@@ -82,8 +79,7 @@ class CatalogSettings(_Section):
 class QuerySettings(_Section):
     duckdb_memory_limit_bytes: Annotated[int, Field(ge=32 * MiB)] = 192 * MiB
     duckdb_threads: Annotated[int, Field(ge=1, le=16)] = 2
-    duckdb_temp_dir: Path = Path(".lakehouse-lite/duckdb-spill")
-    duckdb_timeout_seconds: Annotated[float, Field(gt=0.0)] = 30.0
+    duckdb_temp_dir: Path = Path("/tmp/lhe/duckdb-spill")
     polars_threads: Annotated[int, Field(ge=1, le=16)] = 2
     polars_strategy: Literal["iceberg", "parquet_files"] = "iceberg"
     arrow_batch_rows: Annotated[int, Field(ge=10_000, le=500_000)] = 100_000
@@ -96,15 +92,14 @@ class BenchmarkSettings(_Section):
     runs: Annotated[int, Field(ge=1)] = 5
     seed: int = 20260930
     output_dir: Path = Path("./bench-out")
+    s3_get_per_1k_usd: float = 0.0
+    s3_put_list_per_1k_usd: float = 0.0
+    s3_head_per_1k_usd: float = 0.0
 
 
 class EngineSettings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_prefix="LHE_",
-        env_nested_delimiter="__",
-        env_file=".env",
-        extra="forbid",
-        frozen=True,
+        env_prefix="LHE_", env_nested_delimiter="__", env_file=".env", extra="forbid", frozen=True
     )
     runtime: RuntimeSettings = RuntimeSettings()
     ingestion: IngestionSettings = IngestionSettings()
@@ -119,53 +114,33 @@ class EngineSettings(BaseSettings):
     def _check_invariants(self) -> Self:
         r, b, c = self.runtime, self.buffer, self.compaction
         if not (r.memory_soft_limit_bytes < r.memory_hard_limit_bytes <= r.process_ceiling_bytes):
-            raise ConfigurationError(
-                "require soft < hard <= ceiling",
-                context={
-                    "soft": r.memory_soft_limit_bytes,
-                    "hard": r.memory_hard_limit_bytes,
-                    "ceiling": r.process_ceiling_bytes,
-                },
-            )
+            raise ConfigurationError("require soft < hard <= ceiling")
         baseline, in_hand, slack = 120 * MiB, 16 * MiB, 40 * MiB
         flush_peak = baseline + in_hand + b.max_bytes + int(b.max_bytes * 1.25) + slack
         if flush_peak > r.process_ceiling_bytes:
-            raise ConfigurationError(
-                "buffer.max_bytes cannot fit the flush memory budget",
-                context={
-                    "estimated_flush_peak": flush_peak,
-                    "ceiling": r.process_ceiling_bytes,
-                },
-            )
+            raise ConfigurationError("buffer.max_bytes cannot fit the flush memory budget")
         if c.target_file_bytes < b.max_bytes // 8:
-            raise ConfigurationError(
-                "compaction.target_file_bytes is implausibly small for buffer.max_bytes"
-            )
+            raise ConfigurationError("compaction.target_file_bytes is implausibly small")
         if self.catalog.commit_backoff_base_seconds > self.catalog.commit_backoff_max_seconds:
             raise ConfigurationError(
                 "commit_backoff_base_seconds must be <= commit_backoff_max_seconds"
             )
-
-        # Insecure /tmp validation in prod
         if r.env == "prod":
-            for path_name, path_val in (
-                ("dlq_dir", self.ingestion.dlq_dir),
-                ("duckdb_temp_dir", self.query.duckdb_temp_dir),
-            ):
-                resolved = path_val.resolve()
-                if resolved == Path("/tmp") or resolved.parent == Path("/tmp"):  # noqa: S108
-                    raise ConfigurationError(
-                        f"Insecure default path '{path_name}' in production environment: {path_val}"
-                    )
+            insecure_paths = [
+                str(self.ingestion.dlq_dir),
+                str(self.query.duckdb_temp_dir),
+                self.catalog.warehouse_uri,
+            ]
+            for p in insecure_paths:
+                if p.startswith("/tmp/") or p.startswith("/tmp"):
+                    raise ConfigurationError(f"Insecure default path in prod: {p}")
         return self
 
     @classmethod
-    def load(cls, **kwargs: object) -> "EngineSettings":
-        """Loads and validates settings, mapping Pydantic ValidationError to ConfigurationError."""
+    def load(cls, **kwargs: Any) -> "EngineSettings":
+        from pydantic import ValidationError
+
         try:
-            return cls(**kwargs)  # type: ignore[arg-type]
+            return cls(**kwargs)
         except ValidationError as exc:
-            raise ConfigurationError(
-                f"Invalid engine configuration: {exc}",
-                context={"errors": exc.errors()},
-            ) from exc
+            raise ConfigurationError(f"Invalid configuration: {exc}") from exc

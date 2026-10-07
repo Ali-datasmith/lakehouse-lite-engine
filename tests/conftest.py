@@ -19,7 +19,7 @@ def tmp_catalog_db(tmp_path):
 
 
 @pytest.fixture
-def test_engine_settings(tmp_path, tmp_warehouse, tmp_catalog_db):
+def test_engine_settings(tmp_path, tmp_warehouse, tmp_catalog_db) -> None:
     dlq_dir = tmp_path / "dlq"
     duckdb_spill = tmp_path / "duckdb-spill"
 
@@ -38,6 +38,6 @@ def test_engine_settings(tmp_path, tmp_warehouse, tmp_catalog_db):
 
 
 @pytest.fixture
-def test_engine(test_engine_settings):
+def test_engine(test_engine_settings) -> None:
     with LakehouseEngine(test_engine_settings) as engine:
         yield engine

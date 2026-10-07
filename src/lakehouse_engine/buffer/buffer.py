@@ -1,4 +1,3 @@
-# src/lakehouse_engine/buffer/buffer.py
 import logging
 import threading
 import time
@@ -10,10 +9,7 @@ from typing import TYPE_CHECKING, Protocol
 
 import pyarrow as pa
 
-from lakehouse_engine.exceptions import (
-    BufferOverflowError,
-    SchemaMismatchError,
-)
+from lakehouse_engine.exceptions import BufferOverflowError, SchemaMismatchError
 from lakehouse_engine.governor import Mode
 
 if TYPE_CHECKING:
@@ -53,15 +49,10 @@ class FlushedFile:
 
 class FileCommitter(Protocol):
     def commit_files(self, files: Sequence[FlushedFile], *, flush_id: str) -> "CommitResult": ...
+    def data_dir(self) -> str: ...
 
 
 class CompactionBuffer:
-    """In-memory compaction buffer for incoming Arrow record batches.
-
-    Preserves original flush_id across commit retries to guarantee idempotent fast-append
-    operations.
-    """
-
     def __init__(
         self,
         *,
@@ -70,15 +61,13 @@ class CompactionBuffer:
         writer: "ParquetFlushWriter",
         committer: FileCommitter,
         governor: "ResourceGovernor",
-        data_dir: str,
+        data_dir: str = "",
     ) -> None:
         self._schema = schema
         self._policy = policy
         self._writer = writer
         self._committer = committer
         self._governor = governor
-        self._data_dir = data_dir
-
         self._lock = threading.RLock()
         self._batches: list[pa.RecordBatch] = []
         self._total_rows = 0
@@ -89,22 +78,14 @@ class CompactionBuffer:
         self._closed = False
 
     @property
-    def total_rows(self) -> int:
+    def rows(self) -> int:
         with self._lock:
             return self._total_rows
 
     @property
-    def rows(self) -> int:
-        return self.total_rows
-
-    @property
-    def total_bytes(self) -> int:
+    def bytes(self) -> int:
         with self._lock:
             return self._total_bytes
-
-    @property
-    def bytes(self) -> int:
-        return self.total_bytes
 
     @property
     def pending_files(self) -> tuple[FlushedFile, ...]:
@@ -115,19 +96,11 @@ class CompactionBuffer:
         with self._lock:
             if self._closed:
                 raise RuntimeError("CompactionBuffer is closed.")
-
             if not batch.schema.equals(self._schema, check_metadata=False):
-                raise SchemaMismatchError("RecordBatch schema does not match buffer schema.")
-
+                raise SchemaMismatchError("Schema mismatch.")
             incoming_bytes = batch.get_total_buffer_size()
             if incoming_bytes > self._policy.max_bytes:
-                msg = (
-                    f"Batch size {incoming_bytes} exceeds buffer policy max_bytes "
-                    f"{self._policy.max_bytes}"
-                )
-                raise BufferOverflowError(msg)
-
-            # Pre-flush rule
+                raise BufferOverflowError("Batch exceeds max_bytes.")
             commit_result: CommitResult | None = None
             if (
                 self._total_bytes + incoming_bytes > self._policy.max_bytes
@@ -139,19 +112,14 @@ class CompactionBuffer:
                     else FlushReason.ROW_LIMIT
                 )
                 commit_result = self.flush(reason=reason)
-
             self._governor.check(incoming_bytes=incoming_bytes)
-
             self._batches.append(batch)
             self._total_rows += batch.num_rows
             self._total_bytes += incoming_bytes
             if self._oldest_batch_time is None:
                 self._oldest_batch_time = time.monotonic()
-
-            # Post-append checks
             now = time.monotonic()
             age = now - self._oldest_batch_time if self._oldest_batch_time is not None else 0.0
-
             if self._total_bytes >= self._policy.max_bytes:
                 commit_result = self.flush(reason=FlushReason.BYTE_LIMIT)
             elif self._total_rows >= self._policy.max_rows:
@@ -160,11 +128,9 @@ class CompactionBuffer:
                 commit_result = self.flush(reason=FlushReason.AGE_LIMIT)
             elif self._governor.over_soft_limit():
                 commit_result = self.flush(reason=FlushReason.MEMORY_PRESSURE)
-
             return commit_result
 
     def recover_pending(self) -> "CommitResult | None":
-        """Explicit recovery API for attempting commit replay on uncommitted pending files."""
         with self._lock:
             if not self._pending_files:
                 return None
@@ -174,15 +140,10 @@ class CompactionBuffer:
         with self._lock:
             if not self._batches and not self._pending_files:
                 return None
-
             with self._governor.lease(Mode.FLUSH):
-                pending_result: CommitResult | None = None
-
-                # Step 1: Commit existing pending files first using their original flush_id
                 if self._pending_files:
                     if self._active_flush_id is None:
                         self._active_flush_id = self._pending_files[0].flush_id
-
                     pending_flush_id = self._active_flush_id
                     try:
                         pending_result = self._committer.commit_files(
@@ -190,28 +151,19 @@ class CompactionBuffer:
                         )
                         self._pending_files.clear()
                         self._active_flush_id = None
-                    except Exception as exc:
-                        logger.warning(
-                            "Commit failed for pending flush_id %s: %s", pending_flush_id, exc
-                        )
+                        if not self._batches:
+                            return pending_result
+                    except Exception:
                         raise
-
-                    if not self._batches:
-                        return pending_result
-
-                # Step 2: Flush and commit newly accumulated in-memory batches under a new flush_id
                 if self._batches:
                     if self._active_flush_id is None:
                         self._active_flush_id = uuid.uuid4().hex
-
                     flush_id = self._active_flush_id
-                    rel_path = f"{self._data_dir}/{flush_id}.parquet"
+                    data_dir = self._committer.data_dir()
+                    rel_path = f"{data_dir}/{flush_id}.parquet"
                     batches_to_write = list(self._batches)
                     arrow_bytes = self._total_bytes
-
-                    # Write parquet file
                     stats = self._writer.write(batches_to_write, path=rel_path)
-
                     flushed_file = FlushedFile(
                         path=rel_path,
                         flush_id=flush_id,
@@ -222,28 +174,22 @@ class CompactionBuffer:
                         reason=reason,
                     )
                     self._pending_files.append(flushed_file)
-
-                    # Release RAM before commit
                     self._batches.clear()
                     self._total_rows = 0
                     self._total_bytes = 0
                     self._oldest_batch_time = None
                     del batches_to_write
                     self._governor.release_memory()
-
                     try:
                         result = self._committer.commit_files(
                             self._pending_files, flush_id=flush_id
                         )
-                    except Exception as exc:
-                        logger.warning("Commit failed for flush_id %s: %s", flush_id, exc)
-                        raise
-                    else:
                         self._pending_files.clear()
                         self._active_flush_id = None
                         return result
-
-                return pending_result
+                    except Exception:
+                        raise
+                return None
 
     def close(self) -> "CommitResult | None":
         with self._lock:

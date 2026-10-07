@@ -1,4 +1,3 @@
-# src/lakehouse_engine/catalog/storage.py
 from pathlib import Path
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
@@ -14,19 +13,13 @@ if TYPE_CHECKING:
 def resolve_filesystem(
     uri: str, settings: "StorageSettings | None" = None
 ) -> tuple[pafs.FileSystem, str]:
-    """Resolves a URI (file://, s3://, or local path) to a PyArrow FileSystem and relative path.
-
-    Returns:
-        (filesystem, relative_path)
-    """
     parsed = urlparse(uri)
     scheme = parsed.scheme
-
     if scheme in ("", "file"):
         path_str = parsed.path if scheme == "file" else uri
         p = Path(path_str).resolve()
+        p.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         return pafs.LocalFileSystem(), str(p)
-
     if scheme == "s3":
         endpoint_override = settings.s3_endpoint if settings else None
         region = settings.s3_region if settings else None
@@ -40,7 +33,6 @@ def resolve_filesystem(
             if settings and settings.s3_secret_access_key
             else None
         )
-
         s3_fs = pafs.S3FileSystem(
             endpoint_override=endpoint_override,
             region=region,
@@ -49,5 +41,4 @@ def resolve_filesystem(
         )
         rel_path = f"{parsed.netloc}{parsed.path}"
         return s3_fs, rel_path
-
-    raise ConfigurationError(f"Unsupported storage scheme in URI: {uri}")
+    raise ConfigurationError(f"Unsupported storage scheme: {uri}")
