@@ -6,14 +6,14 @@ from lakehouse_engine.engine import LakehouseEngine
 
 
 @pytest.fixture
-def tmp_warehouse(tmp_path):
+def tmp_warehouse(tmp_path) -> Path:
     warehouse = tmp_path / "warehouse"
     warehouse.mkdir(parents=True, exist_ok=True)
     return str(warehouse)
 
 
 @pytest.fixture
-def tmp_catalog_db(tmp_path):
+def tmp_catalog_db(tmp_path) -> str:
     db = tmp_path / "catalog.db"
     return f"sqlite:///{db}"
 

@@ -19,6 +19,9 @@ class DummyWriter:
 
 
 class DummyCommitter:
+    def data_dir(self) -> str:
+        return "test_data"
+
     def __init__(self, fail_first: bool = False) -> None:
         self.fail_first = fail_first
         self.attempts = 0

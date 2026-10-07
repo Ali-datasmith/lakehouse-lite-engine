@@ -176,18 +176,18 @@ class CatalogManager:
         ]
         if len(matching_data_files) != len(delete_set):
             missing = delete_set - {df.file_path for df in matching_data_files}
-            raise CatalogCommitError(f"Delete paths not found: {missing}")
+            raise CatalogCommitError(f"delete paths not found: {missing}")
         with tbl.transaction() as tx:
             overwrite = tx.update_snapshot(
                 snapshot_properties={"lhe.flush-id": flush_id}
             ).overwrite()
             for df in matching_data_files:
-                overwrite.delete_file(df)
+                overwrite.delete_data_file(df)  # type: ignore[attr-defined]
             added_rows = 0
             for path in add_paths:
                 data_file = parquet_file_to_data_file(tbl.io, tbl.metadata, path)
                 added_rows += data_file.record_count
-                overwrite.append_file(data_file)
+                overwrite.append_data_file(data_file)  # type: ignore[attr-defined]
         fresh_table = (
             self._catalog.load_table(f"{self._settings.namespace}.{self._settings.table_name}")
             if self._catalog

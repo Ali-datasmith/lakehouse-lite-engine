@@ -2,6 +2,7 @@ from pathlib import Path
 
 BANNED_CONSTRUCTS = [
     "streaming=True",
+    "pickle.loads",
     "_export_to_c",
     "_import_from_c",
     "duckdb.arrow",

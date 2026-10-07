@@ -126,7 +126,7 @@ def test_ct07_ct08_ct09_zero_copy_and_capsule() -> None:
     df = pl.from_arrow(batch)
     assert len(df) == 3
 
-    out_batch = df.to_arrow().to_batches()[0]
+    out_batch = df.to_arrow().to_batches()  # type: ignore[union-attr][0]
     assert out_batch.column(0).buffers()[1].address == arr_int.buffers()[1].address
 
 

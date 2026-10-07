@@ -178,4 +178,6 @@ class Compactor:
             }
             for path in plan.input_paths:
                 if path not in existing_files:
-                    raise CompactionError(f"Stale plan: {path} missing.")
+                    raise CompactionError(
+                        f"Compaction plan is stale: input file {path} no longer exists."
+                    )
