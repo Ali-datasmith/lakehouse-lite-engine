@@ -29,6 +29,9 @@ class DummyCommitter:
     def data_dir(self) -> str:
         return "test_data"
 
+    def data_dir(self) -> str:
+        return "test_data"
+
     def commit_files(self, files, *, flush_id):
         self.committed.extend(files)
         return DummyResult(
@@ -97,7 +100,7 @@ def test_buffer_schema_mismatch(tmp_path, test_engine_settings) -> None:
         data_dir=str(tmp_path),
     )
 
-    bad_schema = pa.schema([  # type: ignore[arg-type]pa.field("col", pa.int64())])
+    bad_schema = pa.schema([  # type: ignore[arg-type]  # type: ignore[arg-type]pa.field("col", pa.int64())])
     bad_batch = pa.RecordBatch.from_arrays([pa.array([1])], schema=bad_schema)
 
     with pytest.raises(SchemaMismatchError):
