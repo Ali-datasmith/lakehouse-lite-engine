@@ -100,7 +100,7 @@ def test_buffer_schema_mismatch(tmp_path, test_engine_settings) -> None:
         data_dir=str(tmp_path),
     )
 
-    bad_schema = pa.schema([pa.field("col", pa.int64())])  # type: ignore[arg-type]
+    bad_schema = pa.schema([pa.field("col", pa.int64())])
     bad_batch = pa.RecordBatch.from_arrays([pa.array([1])], schema=bad_schema)
 
     with pytest.raises(SchemaMismatchError):

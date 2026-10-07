@@ -14,7 +14,10 @@ from pyiceberg.io.pyarrow import parquet_file_to_data_file
 from pyiceberg.table import Table
 
 from lakehouse_engine.catalog.schema_guard import assert_compatible
-from lakehouse_engine.exceptions import CatalogCommitError, CatalogConnectionError
+from lakehouse_engine.exceptions import (
+    CatalogCommitError,
+    CatalogConnectionError,
+)
 from lakehouse_engine.ingestion.schema import EVENTS_ARROW_SCHEMA
 
 if TYPE_CHECKING:
@@ -141,30 +144,49 @@ class CatalogManager:
                     raise CatalogConnectionError("Catalog not open.")  # noqa: TRY301
                 fresh_table = self._catalog.load_table(identifier)
                 fresh_table.add_files(
-                    file_paths=file_paths, snapshot_properties={"lhe.flush-id": flush_id}
+                    file_paths=file_paths,
+                    snapshot_properties={"lhe.flush-id": flush_id},
                 )
                 self._table = fresh_table
-                snap_id = (
-                    fresh_table.current_snapshot().snapshot_id
-                    if fresh_table.current_snapshot()
-                    else -1
+                snap = fresh_table.current_snapshot()
+                snap_id = snap.snapshot_id if snap is not None else -1
+                return CommitResult(
+                    snap_id,
+                    flush_id,
+                    attempts,
+                    len(files),
+                    added_rows,
+                    False,
                 )
-                return CommitResult(snap_id, flush_id, attempts, len(files), added_rows, False)
             except CommitFailedException:
                 if attempt == self._settings.commit_max_attempts:
                     break
                 jitter = random.uniform(0.5, 1.5)  # noqa: S311
-                time.sleep(min(backoff_max, backoff_base * (2 ** (attempt - 1))) * jitter)
+                time.sleep(
+                    min(
+                        backoff_max,
+                        backoff_base * (2 ** (attempt - 1)),
+                    )
+                    * jitter
+                )
+            except CatalogConnectionError:
+                raise
             except Exception as exc:
                 raise CatalogCommitError(
-                    f"Commit failed: {exc}", context={"pending_files": file_paths}
+                    f"Commit failed: {exc}",
+                    context={"pending_files": file_paths},
                 ) from exc
         raise CatalogCommitError(
-            "Commit exhausted attempts.", context={"pending_files": file_paths}
+            "Commit exhausted attempts.",
+            context={"pending_files": file_paths},
         )
 
     def commit_replace(
-        self, *, delete: Sequence[str], add_paths: Sequence[str], flush_id: str
+        self,
+        *,
+        delete: Sequence[str],
+        add_paths: Sequence[str],
+        flush_id: str,
     ) -> CommitResult:
         replayed_res = self._check_idempotency(flush_id)
         if replayed_res:
@@ -182,25 +204,21 @@ class CatalogManager:
                 snapshot_properties={"lhe.flush-id": flush_id}
             ).overwrite()
             for df in matching_data_files:
-                overwrite.delete_data_file(df)  # type: ignore[attr-defined]
+                overwrite.delete_data_file(df)
             added_rows = 0
             for path in add_paths:
                 data_file = parquet_file_to_data_file(tbl.io, tbl.metadata, path)
                 added_rows += data_file.record_count
-                overwrite.append_data_file(data_file)  # type: ignore[attr-defined]
-        fresh_table = (
-            self._catalog.load_table(f"{self._settings.namespace}.{self._settings.table_name}")
-            if self._catalog
-            else tbl
-        )
+                overwrite.append_data_file(data_file)
+        identifier = f"{self._settings.namespace}.{self._settings.table_name}"
+        fresh_table = self._catalog.load_table(identifier) if self._catalog else tbl
         self._table = fresh_table
-        snap_id = (
-            fresh_table.current_snapshot().snapshot_id if fresh_table.current_snapshot() else -1
-        )
+        snap = fresh_table.current_snapshot()
+        snap_id = snap.snapshot_id if snap is not None else -1
         return CommitResult(snap_id, flush_id, 1, len(add_paths), added_rows, False)
 
     def close(self) -> None:
         if self._lock_file is not None:
-            with contextlib.suppress(Exception):
+            with contextlib.suppress(OSError):
                 self._lock_file.close()
             self._lock_file = None

@@ -1,4 +1,4 @@
-# tests/integration/test_pipeline.py
+from pathlib import Path\n# tests/integration/test_pipeline.py
 import pydantic_core
 
 from lakehouse_engine.config import EngineSettings

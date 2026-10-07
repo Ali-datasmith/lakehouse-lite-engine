@@ -137,32 +137,33 @@ class CompactionBuffer:
                 return None
             return self.flush(reason=FlushReason.EXPLICIT)
 
+    def _resolve_data_dir(self) -> str:
+        data_dir_uri = self._committer.data_dir()
+        parsed = urlparse(data_dir_uri)
+        return parsed.path if parsed.scheme == "file" else data_dir_uri
+
     def flush(self, reason: FlushReason = FlushReason.EXPLICIT) -> "CommitResult | None":
         with self._lock:
             if not self._batches and not self._pending_files:
                 return None
             with self._governor.lease(Mode.FLUSH):
+                pending_result: CommitResult | None = None
                 if self._pending_files:
                     if self._active_flush_id is None:
                         self._active_flush_id = self._pending_files[0].flush_id
                     pending_flush_id = self._active_flush_id
-                    try:
-                        pending_result = self._committer.commit_files(
-                            self._pending_files, flush_id=pending_flush_id
-                        )
-                        self._pending_files.clear()
-                        self._active_flush_id = None
-                        if not self._batches:
-                            return pending_result
-                    except Exception:
-                        raise
+                    pending_result = self._committer.commit_files(
+                        self._pending_files, flush_id=pending_flush_id
+                    )
+                    self._pending_files.clear()
+                    self._active_flush_id = None
+                    if not self._batches:
+                        return pending_result
                 if self._batches:
                     if self._active_flush_id is None:
                         self._active_flush_id = uuid.uuid4().hex
                     flush_id = self._active_flush_id
-                    data_dir_uri = self._committer.data_dir()
-                    parsed = urlparse(data_dir_uri)
-                    data_dir = parsed.path if parsed.scheme == "file" else data_dir_uri
+                    data_dir = self._resolve_data_dir()
                     rel_path = f"{data_dir}/{flush_id}.parquet"
                     batches_to_write = list(self._batches)
                     arrow_bytes = self._total_bytes
@@ -183,16 +184,11 @@ class CompactionBuffer:
                     self._oldest_batch_time = None
                     del batches_to_write
                     self._governor.release_memory()
-                    try:
-                        result = self._committer.commit_files(
-                            self._pending_files, flush_id=flush_id
-                        )
-                        self._pending_files.clear()
-                        self._active_flush_id = None
-                        return result
-                    except Exception:
-                        raise
-                return None
+                    result = self._committer.commit_files(self._pending_files, flush_id=flush_id)
+                    self._pending_files.clear()
+                    self._active_flush_id = None
+                    return result
+                return pending_result
 
     def close(self) -> "CommitResult | None":
         with self._lock:
