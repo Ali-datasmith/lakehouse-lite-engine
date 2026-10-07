@@ -1,4 +1,5 @@
-from pathlib import Path\n# tests/unit/test_ingestion.py
+from pathlib import Path
+# tests/unit/test_ingestion.py
 import pydantic_core
 import pytest
 
@@ -36,7 +37,8 @@ def test_validator_isolation_path(tmp_path) -> None:
         '{"event_id": 1, "user_id": 100, "event_name": "click", "event_ts": "2026-09-30T12:00:00Z"}'
     )
     invalid_event = '{"event_id": "NOT_INT", "user_id": 100}'
-    ndjson = f"{valid_event}\n{invalid_event}".encode()
+    ndjson = f"{valid_event}
+{invalid_event}".encode()
 
     vbatch = validator.validate(ndjson, source="test_stream", source_offset=2)
     assert vbatch.accepted == 1

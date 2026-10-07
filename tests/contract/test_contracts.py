@@ -15,7 +15,8 @@ from lakehouse_engine.query.polars_adapter import PolarsAdapter
 def test_ct01_ct02_fast_append_and_idempotency(test_engine) -> None:
     event_raw = (
         b'{"event_id": 101, "user_id": 1, "event_name": "test", '
-        b'"event_ts": "2026-09-30T12:00:00Z"}\n'
+        b'"event_ts": "2026-09-30T12:00:00Z"}
+'
     )
     test_engine.ingest(event_raw, source="ct01", source_offset=1)
     commit1 = test_engine.flush()
@@ -41,7 +42,8 @@ def test_ct01_ct02_fast_append_and_idempotency(test_engine) -> None:
 def test_ct03_compaction_replace_commit(test_engine) -> None:
     event_raw = (
         b'{"event_id": 102, "user_id": 2, "event_name": "compact_test", '
-        b'"event_ts": "2026-09-30T12:00:00Z"}\n'
+        b'"event_ts": "2026-09-30T12:00:00Z"}
+'
     )
     test_engine.ingest(event_raw, source="ct03", source_offset=1)
     commit1 = test_engine.flush()

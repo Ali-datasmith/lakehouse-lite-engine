@@ -50,7 +50,9 @@ def test_validator_isolation_path_and_oversize(tmp_path: Path) -> None:
         validator.validate(b"x" * 2000, source="test")
 
     # 2. Malformed NDJSON isolation
-    raw_ndjson = b'{"event_id": 1}\n{"invalid_json": }\n'
+    raw_ndjson = b'{"event_id": 1}
+{"invalid_json": }
+'
     vbatch = validator.validate(raw_ndjson, source="test")
     assert vbatch.rejected >= 1
 

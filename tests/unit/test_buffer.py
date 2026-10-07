@@ -29,9 +29,6 @@ class DummyCommitter:
     def data_dir(self) -> str:
         return "test_data"
 
-    def data_dir(self) -> str:
-        return "test_data"
-
     def commit_files(self, files, *, flush_id):
         self.committed.extend(files)
         return DummyResult(

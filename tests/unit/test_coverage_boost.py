@@ -27,7 +27,12 @@ def test_validator_reject_ratio_breaker(tmp_path: Path) -> None:
 
     # Ingest malformed lines to trip reject ratio breaker
     malformed_ndjson = (
-        b'{"event_id": 1}\n{"invalid": }\n{"invalid": }\n{"invalid": }\n{"invalid": }\n'
+        b'{"event_id": 1}
+{"invalid": }
+{"invalid": }
+{"invalid": }
+{"invalid": }
+'
     )
     with pytest.raises(DeadLetterThresholdExceeded):
         validator.validate(malformed_ndjson, source="test_breaker")
@@ -45,7 +50,8 @@ def test_validator_oversize_line_and_drift(tmp_path: Path) -> None:
     # Line exceeding max_line_bytes
     long_line = (
         b'{"event_id": 1, "user_id": 2, "event_name": "a", "event_ts": "2026-09-30T12:00:00Z", '
-        b'"payload": "' + b"x" * 400 + b'"}\n'
+        b'"payload": "' + b"x" * 400 + b'"}
+'
     )
     vbatch = validator.validate(long_line, source="test_line")
     assert vbatch.rejected == 1
@@ -53,7 +59,8 @@ def test_validator_oversize_line_and_drift(tmp_path: Path) -> None:
     # Extra forbidden schema drift
     drift = (
         b'{"event_id": 1, "user_id": 2, "event_name": "a", "event_ts": "2026-09-30T12:00:00Z", '
-        b'"unknown_field": "drift"}\n'
+        b'"unknown_field": "drift"}
+'
     )
     vbatch_drift = validator.validate(drift, source="test_drift")
     assert vbatch_drift.rejected == 1
