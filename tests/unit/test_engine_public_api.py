@@ -69,7 +69,7 @@ def test_engine_schema_mismatch_rejected(tmp_path: Path) -> None:
         ingestion={"dlq_dir": tmp_path / "dlq"},
         query={"duckdb_temp_dir": tmp_path / "spill"},
     )
-    invalid_schema = pa.schema([  # type: ignore[arg-type]  # type: ignore[arg-type]("wrong_col", pa.int64())])
+    invalid_schema = pa.schema([("wrong_col", pa.int64())])  # type: ignore[arg-type]
     invalid_batch = pa.RecordBatch.from_arrays([pa.array([1])], schema=invalid_schema)
 
     with LakehouseEngine(settings) as engine, pytest.raises(SchemaMismatchError):

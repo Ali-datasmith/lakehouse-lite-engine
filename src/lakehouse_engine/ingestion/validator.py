@@ -109,11 +109,11 @@ class MicroBatchValidator:
             parsed_array = pydantic_core.from_json(raw_bytes)
             if isinstance(parsed_array, list):
                 if len(parsed_array) > self._settings.max_batch_rows:
-                    raise OversizeBatchError("Array count exceeds max_batch_rows.")
+                    raise OversizeBatchError("Array count exceeds max_batch_rows.")  # noqa: TRY301
                 return [pydantic_core.to_json(elem) for elem in parsed_array]
         except OversizeBatchError:
             raise
-        except Exception:
+        except Exception:  # noqa: BLE001
             rejected_records.append(
                 DeadLetter(
                     received_at=ctx.now_utc,
@@ -179,7 +179,7 @@ class MicroBatchValidator:
                         engine_schema_version=SCHEMA_VERSION,
                     )
                 )
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 rejected_records.append(
                     DeadLetter(
                         received_at=ctx.now_utc,

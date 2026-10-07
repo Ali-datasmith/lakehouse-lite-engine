@@ -36,7 +36,7 @@ class QueryService:
             else:
                 try:
                     lf = self._polars_adapter.scan_iceberg(tbl, snapshot_id=snap_id)
-                except Exception:
+                except Exception:  # noqa: BLE001
                     lf = self._polars_adapter.scan_iceberg_files(tbl, snapshot_id=snap_id)
             if columns:
                 lf = lf.select(list(columns))
@@ -81,7 +81,7 @@ class QueryService:
         snapshot_id: int | None = None,
         row_filter: str = "true",
         columns: Sequence[str] | None = None,
-        batch_rows: int | None = None,
+        batch_rows: int | None = None,  # noqa: ARG002
     ) -> pa.RecordBatchReader:
         with self._governor.lease(Mode.QUERY):
             snap_id = snapshot_id if snapshot_id is not None else self._catalog.snapshot_id()

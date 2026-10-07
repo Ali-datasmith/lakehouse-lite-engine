@@ -1,3 +1,4 @@
+import contextlib
 import logging
 import random
 import time
@@ -137,7 +138,7 @@ class CatalogManager:
                 return replayed
             try:
                 if self._catalog is None:
-                    raise CatalogConnectionError("Catalog not open.")
+                    raise CatalogConnectionError("Catalog not open.")  # noqa: TRY301
                 fresh_table = self._catalog.load_table(identifier)
                 fresh_table.add_files(
                     file_paths=file_paths, snapshot_properties={"lhe.flush-id": flush_id}
@@ -152,7 +153,7 @@ class CatalogManager:
             except CommitFailedException:
                 if attempt == self._settings.commit_max_attempts:
                     break
-                jitter = random.uniform(0.5, 1.5)
+                jitter = random.uniform(0.5, 1.5)  # noqa: S311
                 time.sleep(min(backoff_max, backoff_base * (2 ** (attempt - 1))) * jitter)
             except Exception as exc:
                 raise CatalogCommitError(
@@ -200,8 +201,6 @@ class CatalogManager:
 
     def close(self) -> None:
         if self._lock_file is not None:
-            try:
+            with contextlib.suppress(Exception):
                 self._lock_file.close()
-            except Exception:
-                pass
             self._lock_file = None

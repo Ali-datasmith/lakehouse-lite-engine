@@ -50,7 +50,7 @@ class DuckDBSession:
         if not IDENTIFIER_REGEX.match(name):
             raise UnsafeSqlError(f"Invalid relation name: '{name}'")
         if name in self._consumed_streams:
-            raise StreamConsumedError(f"Stream '{name}' already consumed.")
+            raise StreamConsumedError(f"Stream '{name}' has already been registered and consumed.")
         rel = self._con.from_arrow(source)
         rel.create_view(name, replace=True)
         self._consumed_streams.add(name)

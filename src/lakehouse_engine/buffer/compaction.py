@@ -3,6 +3,7 @@ import logging
 import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
+from urllib.parse import urlparse
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -72,7 +73,9 @@ class Compactor:
         with self._governor.lease(Mode.COMPACT):
             self._verify_plan_freshness(plan)
             flush_id = uuid.uuid4().hex
-            data_dir = self._catalog.data_dir()
+            data_dir_uri = self._catalog.data_dir()
+            parsed = urlparse(data_dir_uri)
+            data_dir = parsed.path if parsed.scheme == "file" else data_dir_uri
             output_paths: list[str] = []
             accumulator: list[pa.RecordBatch] = []
             accumulated_bytes = 0
@@ -151,7 +154,7 @@ class Compactor:
                     pf = pq.ParquetFile(out_rel, filesystem=out_fs)
                     output_rows_total += pf.metadata.num_rows
                 if output_rows_total != plan.input_rows:
-                    raise CompactionError("Row count mismatch during compaction.")
+                    raise CompactionError("Row count mismatch during compaction.")  # noqa: TRY301
                 commit_res = self._catalog.commit_replace(
                     delete=plan.input_paths, add_paths=output_paths, flush_id=flush_id
                 )

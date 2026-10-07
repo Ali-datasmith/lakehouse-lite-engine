@@ -111,6 +111,6 @@ class LakehouseEngine:
             for sub in (self._buffer, self._dlq_sink, self._catalog):
                 try:
                     sub.close()
-                except Exception as exc:
-                    logger.exception("Error closing: %s", exc)
+                except Exception:
+                    logger.exception("Error closing subsystem")
             self._closed = True

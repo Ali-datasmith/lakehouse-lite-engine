@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING, Protocol
+from urllib.parse import urlparse
 
 import pyarrow as pa
 
@@ -61,7 +62,7 @@ class CompactionBuffer:
         writer: "ParquetFlushWriter",
         committer: FileCommitter,
         governor: "ResourceGovernor",
-        data_dir: str = "",
+        data_dir: str = "",  # noqa: ARG002
     ) -> None:
         self._schema = schema
         self._policy = policy
@@ -159,7 +160,9 @@ class CompactionBuffer:
                     if self._active_flush_id is None:
                         self._active_flush_id = uuid.uuid4().hex
                     flush_id = self._active_flush_id
-                    data_dir = self._committer.data_dir()
+                    data_dir_uri = self._committer.data_dir()
+                    parsed = urlparse(data_dir_uri)
+                    data_dir = parsed.path if parsed.scheme == "file" else data_dir_uri
                     rel_path = f"{data_dir}/{flush_id}.parquet"
                     batches_to_write = list(self._batches)
                     arrow_bytes = self._total_bytes

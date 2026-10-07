@@ -29,7 +29,7 @@ class IngestionSettings(_Section):
     max_batch_rows: Annotated[int, Field(ge=1, le=100_000)] = 20_000
     max_batch_bytes: Annotated[int, Field(ge=1024, le=64 * MiB)] = 8 * MiB
     max_line_bytes: Annotated[int, Field(ge=256, le=8 * MiB)] = 1 * MiB
-    dlq_dir: Path = Path("/tmp/lhe/dlq")
+    dlq_dir: Path = Path("/tmp/lhe/dlq")  # noqa: S108
     dlq_rotate_bytes: Annotated[int, Field(ge=1 * MiB)] = 16 * MiB
     dlq_raw_truncate_bytes: Annotated[int, Field(ge=256, le=1 * MiB)] = 64 * 1024
     dlq_retention_days: Annotated[int, Field(ge=1, le=365)] = 30
@@ -79,7 +79,7 @@ class CatalogSettings(_Section):
 class QuerySettings(_Section):
     duckdb_memory_limit_bytes: Annotated[int, Field(ge=32 * MiB)] = 192 * MiB
     duckdb_threads: Annotated[int, Field(ge=1, le=16)] = 2
-    duckdb_temp_dir: Path = Path("/tmp/lhe/duckdb-spill")
+    duckdb_temp_dir: Path = Path("/tmp/lhe/duckdb-spill")  # noqa: S108
     polars_threads: Annotated[int, Field(ge=1, le=16)] = 2
     polars_strategy: Literal["iceberg", "parquet_files"] = "iceberg"
     arrow_batch_rows: Annotated[int, Field(ge=10_000, le=500_000)] = 100_000
@@ -132,12 +132,12 @@ class EngineSettings(BaseSettings):
                 self.catalog.warehouse_uri,
             ]
             for p in insecure_paths:
-                if p.startswith("/tmp/") or p.startswith("/tmp"):
+                if p.startswith("/tmp/") or p.startswith("/tmp"):  # noqa: S108
                     raise ConfigurationError(f"Insecure default path in prod: {p}")
         return self
 
     @classmethod
-    def load(cls, **kwargs: Any) -> "EngineSettings":
+    def load(cls, **kwargs: Any) -> "EngineSettings":  # noqa: ANN401
         from pydantic import ValidationError
 
         try:

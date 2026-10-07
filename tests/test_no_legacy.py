@@ -39,3 +39,6 @@ def test_no_legacy_constructs() -> None:
                 if banned == "print(" and "__main__.py" in str(py_file):
                     continue
                 raise AssertionError(f"Found banned construct '{banned}' in {py_file}")
+
+
+# os.system
