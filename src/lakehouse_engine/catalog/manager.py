@@ -123,11 +123,11 @@ class CatalogManager:
         return None
 
     def commit_files(self, files: Sequence["FlushedFile"], *, flush_id: str) -> CommitResult:
-        if not files:
-            raise CatalogCommitError("No files provided.")
         replayed_res = self._check_idempotency(flush_id)
         if replayed_res:
             return replayed_res
+        if not files:
+            raise CatalogCommitError("No files provided.")
         identifier = f"{self._settings.namespace}.{self._settings.table_name}"
         file_paths = [f.path for f in files]
         added_rows = sum(f.rows for f in files)

@@ -3,6 +3,7 @@ from pathlib import Path
 BANNED_CONSTRUCTS = [
     "streaming=True",
     "pickle.loads",
+    "eval",
     "_export_to_c",
     "_import_from_c",
     "duckdb.arrow",
@@ -43,3 +44,4 @@ def test_no_legacy_constructs() -> None:
 
 
 # os.system
+# subprocess.run

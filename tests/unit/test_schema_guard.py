@@ -17,7 +17,7 @@ def test_schema_guard_exact_match() -> None:
         NestedField(5, "payload", StringType(), required=False),
     )
     arrow_schema = pa.schema(
-        [
+        [  # type: ignore[arg-type]
             pa.field("event_id", pa.int64(), nullable=False),
             pa.field("user_id", pa.int64(), nullable=False),
             pa.field("event_name", pa.string(), nullable=False),
@@ -39,7 +39,7 @@ def test_schema_guard_type_mismatch() -> None:
         NestedField(5, "payload", StringType(), required=False),
     )
     arrow_schema = pa.schema(
-        [
+        [  # type: ignore[arg-type]
             pa.field("event_id", pa.int64(), nullable=False),
             pa.field("user_id", pa.int64(), nullable=False),
             pa.field("event_name", pa.string(), nullable=False),

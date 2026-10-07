@@ -39,7 +39,7 @@ class MicroBatchValidator:
     def __init__(self, settings: "IngestionSettings", sink: DeadLetterSink) -> None:
         self._settings = settings
         self._sink = sink
-        self._total_evaluated = 0
+        self._total_checked = 0
         self._total_rejected = 0
 
     def validate(
@@ -80,10 +80,10 @@ class MicroBatchValidator:
             self._sink.flush()
         accepted_count = len(accepted_models)
         rejected_count = len(rejected_records)
-        self._total_evaluated += accepted_count + rejected_count
+        self._total_checked += accepted_count + rejected_count
         self._total_rejected += rejected_count
-        if self._total_evaluated >= self._settings.reject_ratio_min_sample:
-            ratio = self._total_rejected / self._total_evaluated
+        if self._total_checked >= self._settings.reject_ratio_min_sample:
+            ratio = self._total_rejected / self._total_checked
             if ratio > self._settings.max_reject_ratio:
                 self._sink.flush()
                 raise DeadLetterThresholdExceeded("Dead letter threshold exceeded.")

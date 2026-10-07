@@ -8,7 +8,7 @@ from lakehouse_engine.engine import LakehouseEngine
 
 
 @pytest.mark.memory
-def test_mt01_mt02_ingest_rss_and_arrow_memory(test_engine_settings) -> None:
+def test_mt01_mt02_ingest_rss_and_arrow_memory(test_engine_settings) -> None:  # type: ignore[no-untyped-def]
     with RssSampler() as sampler:
         with LakehouseEngine(test_engine_settings) as engine:
             events = [
@@ -35,7 +35,7 @@ def test_mt01_mt02_ingest_rss_and_arrow_memory(test_engine_settings) -> None:
 
 
 @pytest.mark.memory
-def test_mt05_governor_memory_pressure_flush(test_engine_settings) -> None:
+def test_mt05_governor_memory_pressure_flush(test_engine_settings) -> None:  # type: ignore[no-untyped-def]
     # Lower soft limit to force memory pressure
     low_settings = test_engine_settings.model_copy(
         update={

@@ -38,7 +38,10 @@ class DuckDBSession:
         return self
 
     def __exit__(
-        self, et: type[BaseException] | None, ev: BaseException | None, tb: TracebackType | None
+        self,
+        et: type[BaseException] | None,
+        ev: BaseException | None,
+        tb: TracebackType | None,
     ) -> None:
         self.close()
 
@@ -72,7 +75,10 @@ class DuckDBSession:
             )
 
     def sql(
-        self, query: str, *, params: Mapping[str, object] | Sequence[object] | None = None
+        self,
+        query: str,
+        *,
+        params: Mapping[str, object] | Sequence[object] | None = None,
     ) -> duckdb.DuckDBPyRelation:
         self._validate_query(query)
         if params is not None:
@@ -80,11 +86,16 @@ class DuckDBSession:
         return self._con.sql(query)
 
     def sql_stream(
-        self, query: str, *, params: Mapping[str, object] | None = None, batch_rows: int = 100_000
+        self,
+        query: str,
+        *,
+        params: Mapping[str, object] | None = None,
+        batch_rows: int = 100_000,  # noqa: ARG002
     ) -> pa.RecordBatchReader:
         self._validate_query(query)
         if params:
-            self._con.execute(query, list(params.values()))
+            rel = self._con.execute(query, list(params.values()))
         else:
-            self._con.execute(query)
-        return self._con.fetch_record_batch(batch_rows)
+            rel = self._con.execute(query)
+        reader = rel.arrow()
+        return reader

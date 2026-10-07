@@ -52,8 +52,8 @@ def test_storage_s3_resolution() -> None:
     s_settings = StorageSettings(
         s3_endpoint="http://localhost:9000",
         s3_region="us-east-1",
-        s3_access_key_id="minio",  # type: ignore[arg-type]
-        s3_secret_access_key="minio123",  # type: ignore[arg-type] # noqa: S106
+        s3_access_key_id="minio",
+        s3_secret_access_key="minio123",  # noqa: S106
     )
     _fs, rel_path = resolve_filesystem("s3://bucket/path/file.parquet", settings=s_settings)
     assert rel_path == "bucket/path/file.parquet"

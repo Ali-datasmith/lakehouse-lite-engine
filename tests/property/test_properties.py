@@ -9,7 +9,7 @@ from lakehouse_engine.ingestion.schema import EVENTS_ARROW_SCHEMA
 
 
 @given(st.lists(st.integers(min_value=1, max_value=2**62), min_size=1, max_size=100))
-def test_arrow_conversion_property(ids) -> None:
+def test_arrow_conversion_property(ids) -> None:  # type: ignore[no-untyped-def]
     event_ids = pa.array(ids, type=pa.int64())
     user_ids = pa.array([10] * len(ids), type=pa.int64())
     names = pa.array(["event"] * len(ids), type=pa.string())

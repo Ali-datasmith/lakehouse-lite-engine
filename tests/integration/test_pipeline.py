@@ -1,3 +1,5 @@
+from pathlib import Path
+
 # tests/integration/test_pipeline.py
 import pydantic_core
 
@@ -5,7 +7,7 @@ from lakehouse_engine.config import EngineSettings
 from lakehouse_engine.engine import LakehouseEngine
 
 
-def test_full_pipeline_ingest_query_compact(tmp_path) -> None:
+def test_full_pipeline_ingest_query_compact(tmp_path: Path) -> None:
     warehouse = tmp_path / "warehouse"
     warehouse.mkdir(parents=True, exist_ok=True)
     db = tmp_path / "catalog.db"

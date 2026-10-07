@@ -1,12 +1,17 @@
+from collections.abc import Sequence
+
 # tests/unit/test_buffer.py
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pyarrow as pa
 import pytest
 
-from lakehouse_engine.buffer.buffer import BufferPolicy, CompactionBuffer
+from lakehouse_engine.buffer.buffer import BufferPolicy, CompactionBuffer, FlushedFile
 from lakehouse_engine.buffer.writer import ParquetFlushWriter
+from lakehouse_engine.catalog.manager import CommitResult
+from lakehouse_engine.config import EngineSettings
 from lakehouse_engine.exceptions import SchemaMismatchError
 from lakehouse_engine.governor import ResourceGovernor
 from lakehouse_engine.ingestion.schema import EVENTS_ARROW_SCHEMA
@@ -23,25 +28,22 @@ class DummyResult:
 
 
 class DummyCommitter:
-    def __init__(self):
-        self.committed = []
+    def __init__(self, fail_first: bool = False) -> None:
+        self.fail_first = fail_first
+        self.committed: list[FlushedFile] = []
 
     def data_dir(self) -> str:
         return "test_data"
 
-    def commit_files(self, files, *, flush_id):
+    def commit_files(self, files: Sequence["FlushedFile"], *, flush_id: str) -> "CommitResult":
+        if self.fail_first:
+            self.fail_first = False
+            raise RuntimeError("Simulated catalog commit failure")
         self.committed.extend(files)
-        return DummyResult(
-            snapshot_id=1,
-            flush_id=flush_id,
-            attempts=1,
-            added_files=len(files),
-            added_rows=sum(f.rows for f in files),
-            replayed=False,
-        )
+        return CommitResult(1, flush_id, 1, len(files), sum(f.rows for f in files), False)
 
 
-def test_buffer_append_and_flush(tmp_path, test_engine_settings) -> None:
+def test_buffer_append_and_flush(tmp_path: Path, test_engine_settings: EngineSettings) -> None:
     governor = ResourceGovernor(test_engine_settings.runtime)
     writer = ParquetFlushWriter(
         test_engine_settings.buffer,
@@ -83,7 +85,7 @@ def test_buffer_append_and_flush(tmp_path, test_engine_settings) -> None:
     assert buffer.rows == 0
 
 
-def test_buffer_schema_mismatch(tmp_path, test_engine_settings) -> None:
+def test_buffer_schema_mismatch(tmp_path: Path, test_engine_settings: EngineSettings) -> None:
     governor = ResourceGovernor(test_engine_settings.runtime)
     writer = ParquetFlushWriter(
         test_engine_settings.buffer, EVENTS_ARROW_SCHEMA, pa.fs.LocalFileSystem()

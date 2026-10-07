@@ -97,10 +97,10 @@ def test_catalog_manager_commit_retry_and_backoff(tmp_path: Path) -> None:
 
     def failing_load_table(identifier: str) -> object:
         tbl = orig_load_table(identifier)
-        tbl.add_files = MagicMock(side_effect=CommitFailedException("Concurrent commit conflict"))
+        tbl.add_files = MagicMock(side_effect=CommitFailedException("Concurrent commit conflict"))  # type: ignore[method-assign]
         return tbl
 
-    cat._catalog.load_table = failing_load_table  # type: ignore[method-assign,union-attr]
+    cat._catalog.load_table = failing_load_table  # type: ignore[method-assign, union-attr]
 
     with pytest.raises(CatalogCommitError, match="Commit exhausted"):
         cat.commit_files([ff], flush_id="fid1")

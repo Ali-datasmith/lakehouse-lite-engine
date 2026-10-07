@@ -23,7 +23,7 @@ def test_schema_guard_field_count_and_nullability_mismatch() -> None:
         NestedField(1, "event_id", LongType(), required=True),
     )
     arrow_schema = pa.schema(
-        [
+        [  # type: ignore[arg-type]
             pa.field("wrong_name", pa.int64(), nullable=True),
             pa.field("extra_field", pa.string(), nullable=True),
         ]
