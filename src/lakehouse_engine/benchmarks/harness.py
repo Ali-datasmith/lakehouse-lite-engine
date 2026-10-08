@@ -108,7 +108,7 @@ def _execute_csv(engine: str, query: str, data_dir: Path) -> None:
         import duckdb
 
         con = duckdb.connect(":memory:")
-        con.execute(f"CREATE VIEW events AS SELECT * FROM read_csv_auto('{data_dir}/*.csv')")  # noqa: S608
+        con.execute(f"CREATE VIEW events AS SELECT * FROM read_csv_auto('{data_dir}/*.csv')")  # noqa: S608  # nosec B608
         if query == "Q1_point":
             con.execute("SELECT * FROM events WHERE event_id = 42")
         elif query == "Q2_range_agg":
@@ -135,7 +135,7 @@ def _execute_raw_parquet(engine: str, query: str, data_dir: Path) -> None:
         import duckdb
 
         con = duckdb.connect(":memory:")
-        con.execute(f"CREATE VIEW events AS SELECT * FROM read_parquet('{data_dir}/*.parquet')")  # noqa: S608
+        con.execute(f"CREATE VIEW events AS SELECT * FROM read_parquet('{data_dir}/*.parquet')")  # noqa: S608  # nosec B608
         if query == "Q1_point":
             con.execute("SELECT * FROM events WHERE event_id = 42")
         elif query == "Q2_range_agg":
